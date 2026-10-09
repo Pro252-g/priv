@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "transport": "Loopback H264 RTSP/TCP via pinned MediaMTX image",
+  "imageDigest": "sha256:e3e9cd157344567a1a67f6c6606dcc7772b4ff589c23131832ffba3f92b97ca6",
+  "checks": {
+    "fiveFreshDecodedFrames": true,
+    "realOnnxDogDetection": true,
+    "publisherDisconnectDiagnosed": "source_unreachable",
+    "decoderRestartRecovered": true
+  },
+  "limitations": "Emulated RTSP transport. No real NVR, credential/ONVIF/channel/clock test and no 24-hour or restaurant accuracy acceptance."
+}

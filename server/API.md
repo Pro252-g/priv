@@ -1,70 +1,100 @@
-# IEP API
-All API responses JSON except CSV/image. Same-origin cookies; mutating requests must have matching Origin if supplied. Password login for browser sessions; restricted Bearer integration keys for service connectors. No public registration.
-- GET /api/health → {ok:true}
-- POST /api/login {email,password} → {user:{id,email,name}} sets HttpOnly SameSite=Lax session cookie. Bootstrap email IEP_ADMIN_EMAIL (default admin@iep.local), password mandatory IEP_ADMIN_PASSWORD (at least 12 characters). IEP_DATA_DIR overrides SQLite directory. Set IEP_SECURE_COOKIE=true behind HTTPS.
-- POST /api/logout → {ok:true}; GET /api/me → {user}
-- GET /api/restaurants → {restaurants:[{id,name,created_at}]}; POST {name} same path → {restaurant}
-- GET /api/dishes?restaurantId=ID → {dishes:[{id,restaurant_id,name,created_at,samples:[{id,url,created_at}]}]}
-- POST /api/dishes {restaurantId,name} → {dish}; DELETE /api/dishes/ID → {ok:true}
-- POST /api/dishes/ID/samples {image:"data:image/jpeg;base64,..."} (PNG also supported, max 2 MiB decoded) → {sample:{id,url,created_at}}
-- DELETE /api/samples/ID → {ok:true}; image URLs require authentication.
-- POST /api/events {restaurantId,events:[{dishId,sessionId,trackId,crossingId,camera,occurredAt,confidence,mode,image}]} → {inserted,duplicates}. Identical tenant/session/track/crossing keys counted once; only confirmed line crossing should be sent. Max 200 events. confidence 0..1. mode manual or automatic (default automatic), returned in report events. ISO occurredAt; camera defaults Mobile.
-- GET /api/reports?restaurantId=ID&from=ISO&to=ISO → {totals:[{dishId,dishName,count}],events:[{id,dish_id,dish_name,camera,occurred_at,confidence}],total}. Returns latest 1000 events and totals over complete selected period.
-- GET /api/reports.csv same query → UTF-8 CSV.
-All tenant data belongs to the owner tenant of the authenticated account. Staff and API keys additionally require the actual resource restaurant within their scope; caller-supplied restaurantId cannot override a URL resource scope. Unauthorized tenant/restaurant IDs return 404. Errors {error:string}.
+# IEP API 0.4.0
 
-## Separate customer accounts
-Each separately provisioned owner sees only their restaurants and tenant data. Staff roles owner/manager/daily_operator/engineer/viewer are enforced by capability and assigned restaurants on the server. User administration supports create/update/disable/enable; changing an account revokes prior sessions and integration keys. Managers cannot grant owner roles or modify peer managers. Engineers cannot read/write POS or approve days. See [role and risk matrix](../docs/RISK_AND_ACCESS.md).
-Start the server once to initialize its database, then securely supply `IEP_NEW_OWNER_EMAIL` and `IEP_NEW_OWNER_PASSWORD` through environment settings (never commit values) and run `node server/provision.mjs` against the same `IEP_DATA_DIR`. This creates an account without modifying existing accounts and refuses duplicate emails. Remove the provisioning password binding after use. The CLI does not print credentials. Restart is unnecessary. Existing bootstrap accounts retain their original password; changing bootstrap environment values does not reset them.
+Runtime source of truth: authenticated `GET /api/openapi`. [OpenAPI snapshot](../docs/openapi.json), [Arabic integration contract](../docs/INTEGRATION_GUIDE.md), [installation and acceptance guide](../docs/EXECUTION_GUIDE.md).
 
-Optional event `image` is a JPEG or PNG data URL, up to 512 KiB decoded; total API body max 3 MiB. Reports include nullable `snapshot_url`. GET that URL requires its owning account. Snapshots are opt-in; new bytes are stored in the private IEP_MEDIA_DIR filesystem, with image_key/media_status in SQLite. Legacy BLOBs are migrated after a verified pre-migration database backup; storage failures retain the original BLOB.
+## Authentication and validation
 
-## Video experiments
-- POST `/api/experiments` `{restaurantId,name,videoName,durationSec}` → `{experiment}`. Stores metadata only; video remains on the client device.
-- GET `/api/experiments?restaurantId=ID` → `{experiments}`; GET `/api/experiments/ID` → `{experiment}`. Entries include parsed `summary`, status, video_name and duration_sec.
-- POST `/api/experiments/ID` `{status:"running"|"completed"|"failed",summary:{...}}` updates metadata, bounded summary.
-- Events can include `experimentId,mediaTimeSec`; media time must fit experiment duration. GET reports with `experimentId=ID` selects that experiment. **Default reports and reconciliation exclude all experimental events.** Deduplication namespaces experimental sessions by experiment ID; still use a fresh session ID for each independent run.
+Browser sessions use HttpOnly/SameSite=Lax cookies; service calls use `Authorization: Bearer <INTEGRATION_KEY>` over HTTPS. `IEP_ADMIN_PASSWORD` requires at least12 characters. `IEP_ADMIN_EMAIL` defaults toadmin@iep.local. Changing bootstrap values does not reset existing passwords. Use `server/provision.mjs` with private IEP_NEW_OWNER_EMAIL/IEP_NEW_OWNER_PASSWORD bindings for a new tenant.
 
-## POS reconciliation
-POST `/api/pos` `{restaurantId,businessDate:"YYYY-MM-DD",revision:"unique-id",items:[{dishId,sold,cancelled,complimentary,waste}]}`. All quantities nonnegative integers; cancelled cannot exceed sold. Expected output = sold − cancelled + complimentary + waste. A revision replaces the complete day's expectation, preserving earlier revisions in audit storage. Repeating the identical revision/payload is idempotent; reusing it for different data gives 409. Replaying an old revision never makes it current again. No POS provider connection is implied.
-GET `/api/reconciliation?restaurantId=ID&businessDate=YYYY-MM-DD` → `{businessDate,timeZone:"Africa/Cairo",revision,rows:[{dishId,dishName,automatic,manual,observed,expectedOut,difference,pos}],coverage:{sessions,gaps,warnings,complete:false,note}}`. Difference is observed minus expected. Missing expectations are null rather than invented zeros. Live automatic and manual counts are separate. Calendar grouping uses Africa/Cairo, including daylight saving.
+Tenant ownership, actual resource restaurant, staff assignments, capabilities and integration-key scopes apply together. A caller-supplied restaurantId cannot override an existing resource's scope. Changing user role/restaurants or disabling it revokes earlier sessions and keys. Keys cannot manage identities or approve days. Engineers cannot accessPOS.
 
-## Monitoring
-POST `/api/monitor/start` `{restaurantId,camera,sessionId}` → `{monitor}`. Session ID retry is idempotent, cannot rebind a different restaurant/camera.
-POST `/api/monitor/ID/heartbeat` `{}` every 15 seconds and POST `/api/monitor/ID/end` `{reason:"user_stopped"}`.
-GET `/api/monitor?restaurantId=ID` → `{monitors,heartbeatIntervalSec:15,staleAfterSec:45}`. Monitors have server timestamps started_at,last_heartbeat,ended_at, status active/stale/ended and gaps. A heartbeat gap begins 45 seconds after last heartbeat, is returned as ongoing when stale, and is persisted when resumed or ended. This works after server restart. Gap cause is unknown; server does not infer electricity or network failure. Heartbeat coverage does not prove accurate recognition or continuous full-day coverage. Reconciliation reports incomplete coverage explicitly.
+Mutation bodies and nested event/POS rows must be JSON objects. Timestamps require valid ISO strings with explicit timezone, Z oroffset, and normalize toUTC; null, numbers, invalid dates and timezoneless strings return400. Bodies are bounded to3MiB. Origin must match when supplied; no unrestricted CORS.
 
-Fixed model assets are served from `.local/models/{mobilenet,detector}/` under `/models/`. Override root with `IEP_MODELS_DIR`; only model.json and expected shard filenames are exposed.
+Set IEP_SECURE_COOKIE=true behindHTTPS. IEP_TRUSTED_PROXY_IPS is a comma-separated list of exact peerIP addresses, notCIDR. Untrusted peers cannot choose an address throughX-Forwarded-For. Trusted chains resolve from the nearest hop to the first untrusted hop. Client and account login rate limits both apply.
 
-GET `/api/pos?restaurantId=ID&businessDate=YYYY-MM-DD` returns immutable `revisions` newest first, each including items, created_at, and active flag, for audit review.
+Errors: `{error:string}` with400 validation,401 auth,403 capability,404 missing/out-of-scope,409 immutable payload or state conflict,413 size,429 login limit. Public GET `/api/health` is API liveness, not source/model health.
 
-Heartbeat body optionally `{status:"running"|"stalled"}`. A client-reported stalled video is recorded as an ongoing `video_stalled` gap and monitor status `stalled`, despite reachable heartbeats. Returning to running or ending persists that interval. Cause video_stalled is the browser report, not independent diagnosis. Missing heartbeats remain unknown. End reasons are bounded strings such as camera_ended/source_stalled/model_failed.
+## Catalog, reference images and models
 
-## Historical integrity and day filters
-DELETE dish now archives it permanently instead of deleting the row. Catalog listing excludes archived dishes; historic event/POS references retain their original IDs. POS revisions capture dish names; reconciliation retains archived dishes referenced by either counts or expectations. Archived dishes can be retried or adjusted only for days where a POS revision already referenced them; they cannot be introduced into a new day. Queued events captured before archive may still sync, but new events at/after archive are rejected.
-Reports support `businessDate=YYYY-MM-DD` or inclusive `fromDate` and `toDate` business-day dates. UTC boundaries are derived centrally from Africa/Cairo rules by boundary search, including 23/25-hour daylight-saving days. Returned reconciliation `interval` is `[from,to)`; daily counting uses indexed SQL aggregation without loading lifetime events into memory.
-Monitor start optionally accepts stable `sourceId`; persist this per physical source/device independently from fresh processing session IDs. Starting a new session for that source closes the prior open session as source_recovered, bounding any unknown/stalled interval. Source IDs are scoped to restaurant and owner. Legacy callers default sourceId to camera label; multiple distinct cameras should always provide distinct source IDs.
+| Route | Capability and contract |
+|---|---|
+| GET/POST `/api/restaurants` | catalog.read / restaurants.write; list assigned orcreate name |
+| GET `/api/dishes?restaurantId=ID` | catalog.read; active items, references, media status and persistent ambiguity warnings |
+| POST `/api/dishes` | catalog.write; restaurantId,name,kind=dish/drink/object/person,recognitionMode=reference/detector,detectorClasses |
+| POST `/api/dishes/ID` | Partial catalog update; cannot move restaurant |
+| DELETE `/api/dishes/ID` | Archive without deleting history |
+| GET `/api/recognition/classes` | catalog.read; COCO80 plus tenant custom labels |
+| GET `/api/model-profiles` or `/api/model-profiles/ID` | catalog.read; paginated list orspecific profile |
+| POST `/api/model-profiles` | integrations.manage; name,modelSha25664hex,version,classes:[{name,label}],1..256labels |
+| POST `/api/dishes/ID/samples` | catalog.write; JPEG/PNG dataURL≤2MiB decoded,variantLabel≤100 |
+| GET/DELETE `/api/samples/ID` | Protected image / audited reference deletion |
 
-Reports support cursor pagination: set `limit` (1–200; default 200 when paging), then pass both `beforeOccurredAt` and `beforeId` from returned `nextCursor`. Events order by `(occurred_at DESC,id DESC)`; equal timestamps and backfills retain deterministic cursor behavior. Response includes `hasMore`, `nextCursor` or null, and compatibility nextBeforeId/nextBeforeOccurredAt. Totals always cover the complete selected period, independent of page. Omitting all pagination parameters preserves the latest 1000 events. Reconciliation includes current `review` and `coverage.unresolvedUnknown`, limited to unresolved live crossings in the selected Cairo day; unknowns are excluded from confirmed counts and trigger an incompleteness warning.
+COCO does not containplate. Profile registration does not train or modify browser COCO; matching ONNX weights and ordered labels must be installed and verified onedge. detectorClasses accepts tenant vocabulary, up to256 selections. Reference variants share dishId; duplicate dish+imageSHA256+variant uploads deduplicate.
 
-## Administration, governance and integration reference
-GET /api/access returns effective user capabilities, role definitions and allowed key scopes. GET /api/users, POST /api/users, POST /api/users/ID administer assigned staff; body role,restaurantIds,disabled (strict boolean). POST /api/integration-keys creates a hashed restricted key and returns its raw token once; GET lists metadata only; POST /api/integration-keys/ID/revoke permanently invalidates it. Expiry and creator's current permissions are enforced. Keys cannot manage identities, audit or approve days.
-GET /api/risks?restaurantId=ID seeds/returns a per-restaurant risk register. POST /api/risks/ID updates probability/impact1–5, status, mitigation, assignee, notes. Acceptance/closure additionally requires day.approve capability, named assignee and notes.
-GET/POST /api/day-reviews reads/approves/reopens a calendar day's review. Approval requires current posRevision, reason, acknowledgeIncomplete=true; it locks POS until reopening. Newly received live confirmed/unknown events or live corrections invalidate approval to needs_review. Experiments remain isolated.
-POST /api/events/ID/corrections {action:void|reclassify,dishId,reason} preserves the original and applies the latest correction in totals. GET returns correction history. POST /api/unknown-events {restaurantId,events:[{sessionId,trackId,crossingId,occurredAt,reason,image,experimentId,mediaTimeSec}]} persists up to100 uncertain crossings; GET returns latest200 in live/experiment scope; POST /api/unknown-events/ID/resolve {action:confirm|exclude,dishId,reason} requires day.approve and is idempotent for identical resolution. Unknown snapshots require reports.read and correct restaurant scope. Unresolved records do not enter confirmed totals.
-GET /api/audit returns scoped administrative change records, no secrets. GET /api/openapi returns downloadable OpenAPI; GET /api/model-info returns verified download provenance; GET /api/capacity returns measured planning assumptions and free space on the data directory filesystem. The UI exposes API reference/probes/key management, risk/unknown/correction/day-review screens, staff management and capacity calculations.
-See [integration guide](../docs/INTEGRATION_GUIDE.md) and [OpenAPI snapshot](../docs/openapi.json). Current API prepares future cashier/edge integration; it does not implement a specific POS vendor or Hikvision RTSP connector.
+New images are private filesystem files; SQLite stores image_key/media_status. Catalog never returnsBLOBs. Image routes require actual restaurant access. Legacy BLOB migration takes a verified DB backup first and preserves originalBLOBs on failedwrites. Status isready/pending/missing/corrupt/legacy/none. Reference create/delete audit includes actor/key/hash/variant/restaurant. Backups require bothDB and media; S3/MinIO adapter is not implemented.
 
-## Catalog and private media (0.3.0)
+## Sources, leases and diagnostics
 
-`GET /api/recognition/classes` requires catalog.read and returns `{classes:[{id,name,label}],model}` with the installed COCO80 vocabulary. Canonical `name` strings, not sparse numeric COCO IDs, are used for mappings.
+| Route | Capability and contract |
+|---|---|
+| GET `/api/sources?restaurantId=ID` | monitor.read; registry/config/sanitized health |
+| POST `/api/sources` | integrations.manage; restaurantId,sourceId,name,kind,config |
+| GET/POST `/api/sources/ID` | monitor.read / integrations.manage; read orupdate name/enabled/config |
+| POST `/api/sources/ID/lease` | monitor.write; bootId,ttlSec(default45,30..60); returnsleaseId/expiresAt/serverTime |
+| GET/POST `/api/sources/ID/health` | monitor.read/write; sequenced health |
+| GET/POST `/api/sources/ID/gaps` | monitor.read/write; paginated immutable gaps |
 
-Create `/api/dishes` with `{restaurantId,name,kind,recognitionMode,detectorClasses}`; defaults `kind:"dish"`, `recognitionMode:"reference"`, `detectorClasses:[]` preserve legacy clients. kind is dish/drink/object/person; mode reference/detector. Detector mode needs one or more valid canonical classes. `POST /api/dishes/ID` partially updates name/kind/mode/classes; it cannot move a restaurant or reactivate archived data. Responses include warnings for competing detector/reference assignments. The detector operates within80 trained classes; item names do not train it. A general class cannot determine the contents of an opaque cup.
+sourceId matches `[A-Za-z0-9][A-Za-z0-9_.-]{0,179}` and is unique pertenant. kind=rtsp/usb/browser/file. Config accepts only normalizedroi[x,y,w,h], line{orientation,position,direction}, targetFps.1..30,maxObjects1..40 and optional tenant-ownedmodelProfileId. URLs/passwords remain in private edge configuration; they are forbidden in APIconfig. Worker calibration/modelSHA256/labels must match registry.
 
-Reference upload accepts `{image,variantLabel}` (label at most100 characters) and deduplicates same item+image SHA256+label. Catalog returns variantLabel, image_key, media_status and authenticated url without media BLOBs. Different variants belong to the same dishId. New event/report/unknown records expose image_key and media_status (ready/pending/missing/corrupt/legacy/none); those keys are storage identities, not public URLs.
+An active lease rejects a different bootId409. The same boot renews its interval; renewal afterexpiry creates a new leaseId rather than extending an expired window retroactively. Live rtsp/usb known andunknown events require sourceId/sourceLeaseId and occurredAt inside the storedinterval. Previously queued valid-window events can upload later. Worker stops counting when lease expires, normally45 seconds after failedrenewal. NTP and one producer perphysical source are required. Browser and fileexperiments are exempt inthisversion.
 
-Event/unknown upload returns inserted/duplicates and optional `mediaPending`. A nonzero mediaPending means metadata was accepted but media did not commit: retain the original image and retry the identical event identity/payload. Do not add another event. Conflicting retry image content returns409; an acknowledged count must remain unchanged during media repair. Reference responses include sample plus mediaPending (0/1).
+Health body `{status,bootId,sequence,observedAt,metrics,errorCode}`. Status starting/running/stalled/offline/error. Only nonnegative fps/frameAgeSec/queueDepth/oldestQueueAgeSec/freeDiskBytes/inferenceMs metrics; queueDepth/freeDiskBytes are integers. No rawmessage/exception/config fields. Codes none/decoder_unavailable/source_unreachable/auth_failed/inference_failed/storage_full/upload_failed/calibration_required. Sequence increases perboot; identicalretry idempotent, stale/changed409. GET addsreceivedAt/ageSec/stale after45 seconds. Telemetry doesnot prove complete oraccurate counts.
 
-Images are read only through existing authenticated sample/snapshot routes with tenant and actual restaurant authorization. SQLite metadata and private filesystem media must both be backed up; S3/MinIO is not implemented. `/api/capacity` separates DB/media free space and external NVR video from server image capacity.
+Gap body `{gapId,startAt,endAt,cause,recoverable}` with explicittimezoneISO, end>start and strictboolean. Causes power_loss/source_unreachable/video_stalled/upload_failed/inference_failed/process_restart/unknown. Samepayload retry deduplicates, changedpayload409. Gaps join dailyreconciliation; recoverable doesnot mean backfill completed.
 
-New object/person items are excluded from POS input and reconciliation. Historic POS rows remain readable if an item's kind changes later. Still-image analysis saves `/api/experiments` with durationSec0 and summary source still-image; detectedCounts are presence results and never create operational events.
+## Crossing events, review and historical integrity
+
+POST `/api/events` `{restaurantId,events:[{dishId,sessionId,trackId,crossingId,camera,occurredAt,confidence,mode,image?,sourceId?,sourceLeaseId?,experimentId?,mediaTimeSec?}]}`. Max200events. confidence0..1; automatic uses events.write, manual uses events.manual. camera defaultsMobile. JPEG/PNG snapshot≤512KiB. Experiment media position0..duration+1, withmatchingexperimentId. Dish must belong torestaurant. New events at/afterarchive409; originalprearchive retries remainpossible.
+
+Typed identity includes owner,restaurant,explicitlive/experimentnamespace,experimentId andoriginalsession/track/crossing. User-chosen sessionstrings cannotcollide with experimentnamespace. Known andunknown shareonecrossing registry and produceoneevent irrespective ofarrivalorder ormanualconfirmation. Stable retry returnsinserted/duplicates; changed item/time/camera/confidence/mode/source/lease/media-position409. Unknown reason/time/source/lease changes likewise409.
+
+Image repair keeps originalpayload andbytes. mediaPending>0 meansmetadata accepted but image needsretry; do notacknowledge anothercount. Different imagebytes409. Missing evidence doesnoterase event. GET `/api/events/ID/snapshot` requiresreports.read andactualrestaurant access.
+
+POST `/api/unknown-events` max100, events.write, sameidentity/time plusreason withoutdish/confidence. Unresolved rows excludeconfirmed totals. POST `/api/unknown-events/ID/resolve` `{action:confirm|exclude,dishId?,reason}` needsday.approve; identicalresolution idempotent, conflict409. Confirm reuses existingcrossing event and rejects dish archived atcrossingtime. Excluded crossings cannot silently become known.
+
+POST `/api/events/ID/corrections` `{action:void|reclassify,dishId?,reason}` preserves originals and applies latest correction; GET returns history. Replacementname is captured andarchivepolicy is consistent. New liveevent/unknown/correction invalidates approvedday; experiments stayisolated.
+
+Migration preserves numericIDs/media. Older review doublecounts become auditedduplicate aliases, notdeletedrecords; countview excludes aliases and affectedapproveddays become needs_review. New eventnames are snapshots. Names changed beforemigration cannotbe reconstructed; currentavailable names backfill those legacyrows. Totals remainone row perdishId: singlehistoricalname, otherwisecurrentname plushistoricalNames list. Eventrows usecapturednames.
+
+## Bounded historical reads
+
+| Route | Filters and cursor |
+|---|---|
+| `/api/reports` | restaurantId,businessDate orfromDate/toDate orfrom/to, optionalexperimentId; limit1..200 +bothbeforeOccurredAt/beforeId |
+| `/api/unknown-events` | restaurantId, optionalexperimentId,businessDate/fromDate/toDate,state=unresolved/resolved/all; limit1..200 default100,beforeId |
+| `/api/experiments` | restaurantId,businessDate oncreation; limit1..100 default50,beforeId |
+| `/api/monitor` | restaurantId,businessDate onintervaloverlap; limit1..200 default100,beforeId |
+| `/api/model-profiles` | limit1..100 default50,beforeId |
+| `/api/sources/ID/gaps` | limit1..200 default100,beforeId |
+
+Paged responses havehasMore/nextBeforeId; reports usesnextCursor{beforeOccurredAt,beforeId}. Reporttotals cover thecompleteperiod; no paginationparameters preserves latest1000events compatibility. reports.csv exports aggregatecounts. Cairo/DST-aware dayinterval is[from,to); SQLdayfilters precedelimits. Reconciliationreturns up to1000monitors withsessionsTruncated/warning whenneeded; paginatedmonitor exposesremaininghistory. Latearrivals canrequire reloadingexportperiod anddeduplicatingIDs.
+
+## Experiments, POS, governance and operation
+
+POST `/api/experiments` `{restaurantId,name,videoName,durationSec0..86400}` storesmetadata only. GET `/api/experiments/ID` parses summary. POSTsamepath `{status:running|completed|failed,summary:object}` allows up to256KiB encodedJSON.
+
+File runs atomicallyclaim summary.edgeBinding `{fileSha256,fingerprint,experimentId,catalogFingerprint?}`, with64lowercasehex hashes. Currentworker suppliescatalogFingerprint; legacyAPIbindings mayomitit. Concurrentdifferent firstclaims409; later differentfile/config/catalog409. Replacing summary cannotdelete binding. A different analysis requiresnewexperiment. Provenance includesactualcatalog/referencecontentidentities andconfig/model manifests. Default reports andPOS excludeexperiment events. Still-image duration0 ispresenceonly, withoutoperationalevents. AutomaticNVRhistory backfill isnotimplemented.
+
+POST `/api/pos` `{restaurantId,businessDate,revision,items:[{dishId,sold,cancelled,complimentary,waste}]}` replaces complete day'sexpectations while preserving revisions. Max500rows; integer0..1000000; cancelled≤sold. Expected=sold−cancelled+complimentary+waste under agreedexitsemantics. Same revision/dataidempotent, changeddata409, replayoldrevision doesnotmakeitcurrent. Object/person excluded fromnewPOS unlesshistoricalPOS alreadyreferencedthem. Approvedday requiresmanagerreopen. GET lists revisions.
+
+GET `/api/reconciliation` returnsobserved−expected, manual/automatic separately, revision/review andcoverage{sessions,gaps,warnings,unresolvedUnknown,sessionsTruncated,complete:false}. Missing expectation isnull, notzero. Coverage anddifferences do notproveabsenceofloss orresponsibility.
+
+POST `/api/monitor/start` `{restaurantId,sourceId,camera,sessionId}`, heartbeat `{status:running|stalled}` every15 seconds, `/end` withboundedreason. Sameidentity retry cannotrebind. New source sessionclosespreviousone andbounds gap. stale45 seconds; gapsunknown orclientreportedvideo_stalled. Noautomatic inferenceofpowerfailure.
+
+GET `/api/access`, GET/POST `/api/users`, POST `/api/users/ID`, GET/POST `/api/integration-keys`, POST `/api/integration-keys/ID/revoke` enforce owner/manager/daily_operator/engineer/viewer roles. Keytoken isshownonce; listingsshowmetadataonly. GET `/api/audit` returnsscoped changes withkeyId whereapplicable, nosecrets.
+
+GET `/api/risks?restaurantId=ID` andPOST `/api/risks/ID` handle probability/impact1..5,status,mitigation,assignee,notes. Acceptance/closure needsday.approve andnamedresponsible/evidence. GET/POST `/api/day-reviews` require currentPOSrevision,reason,acknowledgeIncomplete=true forapproval. This locksPOS butdoesnotcertifyvisionaccuracy.
+
+GET `/api/model-info` returnsmodel downloadprovenance. GET `/api/capacity` separates DB/mediafree space andNVRvideo. Private storage cannot resolveunderpublicassets; publicsymlinks cannotexpose DB/media. Backup/restore handlesboth DB andmedia. Permanent4xx retainoriginalevidence forreview; 5xx/network retryoriginalidentities withboundedbackoff. No silentlydroppedqueue orclaimofunseen output.
+
+Edge RTSP/USB/file runtime is implemented. SpecificPOSprovider integration, ONVIF/NVRrecording retrieval/backfill, restaurantmodel training andfieldaccuracy/fullshift acceptance remainseparate work.

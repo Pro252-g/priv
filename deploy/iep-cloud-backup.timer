@@ -1,0 +1,10 @@
+[Unit]
+Description=Daily IEP backup in Cairo time
+
+[Timer]
+OnCalendar=*-*-* 03:15:00 Africa/Cairo
+Persistent=true
+Unit=iep-cloud-backup.service
+
+[Install]
+WantedBy=timers.target

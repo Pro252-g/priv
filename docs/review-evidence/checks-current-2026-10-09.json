@@ -1,0 +1,52 @@
+{
+  "schemaVersion": 1,
+  "finishedAt": "2026-10-09T12:53:20.653531+00:00",
+  "version": "0.4.0",
+  "verification": {
+    "nodeTests": {
+      "passed": 66,
+      "failed": 0,
+      "command": "npm test"
+    },
+    "edgeTests": {
+      "passed": 19,
+      "failed": 0,
+      "command": "npm run test:edge"
+    },
+    "browserScripts": {
+      "passed": 6,
+      "failed": 0,
+      "command": "npm run test:browser"
+    },
+    "tfjsModels": {
+      "shaVerified": true,
+      "actualCpuFrames": 3,
+      "embeddingDimensions": 1280
+    },
+    "edgeExport": {
+      "shaVerified": true,
+      "repeatByteIdentical": true,
+      "onnxMatchesTorch": true
+    },
+    "nativeFileIntegration": "edge-integration-2026-10-09.json",
+    "rtspTransport": "rtsp-integration-2026-10-09.json",
+    "deploymentTlsBackup": "deployment-2026-10-09.json",
+    "installScriptExecuted": true,
+    "independentReview": "No remaining P1 found in scoped server/edge critical review; additional Docker runtime issues fixed and validated."
+  },
+  "notValidated": [
+    "Restaurant dish model/data/accuracy",
+    "Actual Hikvision hardware/channels/credentials",
+    "Android device and public HTTPS/ACME",
+    "24-hour sustained workload/thermal test",
+    "Automatic NVR playback/backfill",
+    "Vendor-specific POS connector",
+    "Offsite encrypted backup and retention deployment"
+  ],
+  "npmAudit": {
+    "moderateTransitiveAdvisory": "GHSA-hp3w-g68c-fv3c",
+    "latestRegistryVersionAtCheck": "sprintf-js1.1.3",
+    "upstreamPatchAvailable": false,
+    "knownApplicationFormatRoute": false
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "api": {"baseUrl": "https://iep.example.com", "apiKeyEnv": "IEP_API_KEY", "restaurantId": 1},
+  "source": {"id": 1, "sourceId": "pass-food-01", "kind": "rtsp", "urlEnv": "IEP_SOURCE_URL"},
+  "detector": {
+    "path": "/opt/iep/models/yolox_tiny.onnx",
+    "sha256": "REPLACE_WITH_VERIFIED_64_HEX_SHA256",
+    "format": "yolox", "inputSize": [416, 416], "scoreThreshold": 0.4,
+    "origin": "https://github.com/Megvii-BaseDetection/YOLOX/releases/tag/0.1.1rc0",
+    "license": "Apache-2.0"
+  },
+  "embedding": {
+    "path": "/opt/iep/models/mobilenet-v2-features.onnx",
+    "sha256": "REPLACE_WITH_VERIFIED_64_HEX_SHA256",
+    "inputSize": [224, 224], "preprocess": "imagenet-rgb", "featureOutput": true,
+    "license": "BSD-3-Clause", "origin": "https://download.pytorch.org/models/mobilenet_v2-7ebf99e0.pth"
+  },
+  "stateDir": "/var/lib/iep-edge/pass-food-01",
+  "calibrated": false,
+  "targetFps": 5,
+  "maxObjects": 4,
+  "roi": [0, 0, 1, 1],
+  "line": {"orientation": "horizontal", "position": 0.5, "direction": "down"},
+  "tracking": {"minObservations": 3, "maxMissingSec": 1.5, "confirmationSec": 1.5, "maxDistance": 0.18, "hysteresis": 0.015},
+  "storage": {"maxQueueBytes": 2147483648, "maxQueueRows": 100000, "reserveFreeBytes": 536870912},
+  "reference": {"threshold": 0.85, "margin": 0.025},
+  "sourceTimeoutSec": 5,
+  "unchangedReviewSec": 60,
+  "catalogRefreshSec": 300,
+  "heartbeatSec": 15
+}

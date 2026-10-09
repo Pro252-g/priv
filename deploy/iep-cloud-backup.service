@@ -1,0 +1,11 @@
+[Unit]
+Description=IEP verified database and private media backup
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/iep/app
+ExecStart=/usr/bin/docker compose --env-file /etc/iep/cloud.env -f /opt/iep/app/deploy/compose.yml run --rm backup
+TimeoutStartSec=1h
+UMask=0077

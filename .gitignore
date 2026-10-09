@@ -2,3 +2,11 @@ node_modules/
 .local/
 .env
 *.log
+__pycache__/
+*.py[cod]
+deploy/cloud.env
+deploy/api.env
+deploy/edge.env
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm

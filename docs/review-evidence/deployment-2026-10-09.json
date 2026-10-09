@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "checks": {
+    "composeStartup": true,
+    "nonrootUid1000": true,
+    "tlsVerifiedLocalCA": true,
+    "httpRedirect": true,
+    "webPageAndVendorAssets": true,
+    "secureCookie": true,
+    "authenticatedCatalogAndEvent": true,
+    "privateSnapshotAnd401Isolation": true,
+    "backupVerified": true
+  },
+  "limitations": "Loopback Caddy internal CA, no public ACME/domain, VPS/Android/NVR hardware or restaurant accuracy validation."
+}

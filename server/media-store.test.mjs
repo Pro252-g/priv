@@ -6,3 +6,27 @@ test('reference and event images use private files; missing/corrupt assets repai
 test('unavailable media preserves counts and retry heals both confirmed unknown evidence',async()=>{const x=await setup(true);try{const payload={restaurantId:x.restaurant.id,events:[{...event('1'),dishId:x.dish.id}]};let r=await x.call('/api/events',payload);assert.equal(r.body.inserted,1);assert.equal(r.body.mediaPending,1);const unknown={restaurantId:x.restaurant.id,events:[{...event('unknown'),dishId:undefined,confidence:undefined,reason:'uncertain'}]};r=await x.call('/api/unknown-events',unknown);assert.equal(r.body.mediaPending,1);const u=(await x.call('/api/unknown-events?restaurantId='+x.restaurant.id)).body.records[0];await x.call('/api/unknown-events/'+u.id+'/resolve',{action:'confirm',dishId:x.dish.id,reason:'reviewed'});assert.equal((await x.call('/api/reports?restaurantId='+x.restaurant.id)).body.total,2);rmSync(x.mediaDir);r=await x.call('/api/unknown-events',unknown);assert.equal(r.body.duplicates,1);assert.equal(r.body.mediaPending,undefined);r=await x.call('/api/events',payload);assert.equal(r.body.inserted,0);assert.equal(r.body.mediaPending,undefined);assert.ok((await x.call('/api/reports?restaurantId='+x.restaurant.id)).body.events.every(e=>e.media_status==='ready'));}finally{await x.close();}});
 test('legacy BLOB migration makes verified backup, preserves fallback on failure and is repeatable',async()=>{const x=await setup(true);const owner=x.db.prepare('SELECT id FROM users').get().id;let app=x;try{x.db.prepare('INSERT INTO samples(dish_id,mime,data) VALUES(?,?,?)').run(x.dish.id,'image/png',png);await new Promise(r=>x.server.close(r));app=createApp({dataDir:x.dataDir,mediaDir:x.mediaDir,adminPassword:'media-test-password'});let row=app.db.prepare('SELECT * FROM samples').get();assert.deepEqual(Buffer.from(row.data),png);assert.equal(row.media_status,'legacy');await new Promise(r=>app.server.close(r));rmSync(x.mediaDir);app=createApp({dataDir:x.dataDir,mediaDir:x.mediaDir,adminPassword:'media-test-password'});row=app.db.prepare('SELECT * FROM samples').get();assert.equal(row.data,null);assert.equal(row.media_status,'ready');assert.deepEqual(readFileSync(path.join(x.mediaDir,row.image_key)),png);assert.ok(existsSync(path.join(x.dataDir,'migration-backups')));await new Promise(r=>app.server.close(r));app=createApp({dataDir:x.dataDir,mediaDir:x.mediaDir,adminPassword:'media-test-password'});assert.equal(app.db.prepare('SELECT COUNT(*) n FROM samples').get().n,1);}finally{await new Promise(r=>app.server.close(r));rmSync(x.dir,{recursive:true,force:true});}});
 test('person counts remain in reports and stay out of cashier reconciliation',async()=>{const x=await setup();try{const person=(await x.call('/api/dishes',{restaurantId:x.restaurant.id,name:'Visitors',kind:'person',recognitionMode:'detector',detectorClasses:['person']})).body.dish;await x.call('/api/events',{restaurantId:x.restaurant.id,events:[{...event('person'),dishId:person.id}]});assert.equal((await x.call('/api/reports?restaurantId='+x.restaurant.id)).body.total,1);const rec=(await x.call('/api/reconciliation?restaurantId='+x.restaurant.id+'&businessDate=2026-10-09')).body;assert.equal(rec.rows.some(r=>r.dishId===person.id),false);assert.equal((await x.call('/api/pos',{restaurantId:x.restaurant.id,businessDate:'2026-10-09',revision:'p1',items:[{dishId:person.id,sold:1}]})).status,400);}finally{await x.close();}});
+
+test('recovered media heals only after SHA verification and ready reads do not write database rows',async()=>{
+ const x=await setup();try{
+  const sample=(await x.call('/api/dishes/'+x.dish.id+'/samples',{image,variantLabel:'recovery'})).body.sample;
+  const owner=x.db.prepare('SELECT id FROM users').get().id,file=path.join(x.mediaDir,sample.image_key);
+  for(const state of ['pending','missing','corrupt']){
+   x.db.prepare('UPDATE media_objects SET status=?,error_code=? WHERE image_key=?').run(state,'old_failure',sample.image_key);
+   x.db.prepare('UPDATE samples SET media_status=? WHERE id=?').run(state,sample.id);
+   assert.equal(x.media.status(sample.image_key,owner),'ready');
+   assert.equal(x.db.prepare('SELECT media_status FROM samples WHERE id=?').get(sample.id).media_status,'ready');
+  }
+  const corrupt=Buffer.from(png);corrupt[7]^=1;writeFileSync(file,corrupt);
+  x.db.prepare("UPDATE media_objects SET status='pending' WHERE image_key=?").run(sample.image_key);
+  assert.equal(x.media.status(sample.image_key,owner),'corrupt');
+  writeFileSync(file,png);assert.equal(x.media.status(sample.image_key,owner),'ready');
+  const before=x.db.prepare('SELECT total_changes() n').get().n;
+  for(let i=0;i<10;i++)assert.deepEqual(x.media.read(sample.image_key,owner).data,png);
+  assert.equal(x.db.prepare('SELECT total_changes() n').get().n,before);
+  for(const table of ['samples','events','unknown_crossings']){
+   const plans=x.db.prepare(`EXPLAIN QUERY PLAN UPDATE ${table} SET media_status='ready' WHERE image_key=?`).all(sample.image_key);
+   assert.ok(plans.some(p=>p.detail.includes(`${table}_image_key_idx`)),JSON.stringify(plans));
+  }
+ }finally{await x.close();}
+});

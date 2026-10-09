@@ -1,0 +1,70 @@
+{
+  "schemaVersion": 1,
+  "checks": {
+    "realOnnxFilePipeline": true,
+    "privateCropRetrieval": true,
+    "operationalCountsUnchanged": true,
+    "identicalReplayCountOnce": true,
+    "blockedQueueRows": 0
+  },
+  "experimentCount": 1,
+  "fixture": "Public YOLOX dog photograph composited into a moving CFR AVI; not restaurant dish recognition or NVR hardware",
+  "sourceChecks": {
+    "storage": {
+      "ok": true,
+      "queueDepth": 0,
+      "queueBytes": 0,
+      "oldestQueueAgeSec": 0,
+      "blockedRows": 0,
+      "freeDiskBytes": 17559752704,
+      "capacityAvailable": true
+    },
+    "model": {
+      "ok": true,
+      "sha256": "427cc366d34e27ff7a03e2899b5e3671425c262ea2291f88bb942bc1cc70b0f7",
+      "labels": 80,
+      "provider": "CPUExecutionProvider"
+    },
+    "referenceModel": {
+      "ok": false,
+      "code": "missing_embedding_model"
+    },
+    "lan": {
+      "ok": true,
+      "code": "local_source"
+    },
+    "cloud": {
+      "ok": true,
+      "code": "local_http_api_reachable"
+    },
+    "auth": {
+      "ok": true,
+      "code": "required_scopes_valid"
+    },
+    "catalog": {
+      "ok": true,
+      "items": 1,
+      "referenceVectors": 0
+    },
+    "calibration": {
+      "ok": true,
+      "code": "approved"
+    },
+    "source": {
+      "ok": true,
+      "code": "frame_decoded"
+    },
+    "frame": {
+      "ok": true,
+      "width": 640,
+      "height": 480,
+      "ageSec": 0.001811981201171875,
+      "timestampOrigin": "declared-file-start-plus-source-PTS"
+    },
+    "inference": {
+      "ok": true,
+      "detections": 4,
+      "elapsedMs": 51.3490519952029
+    }
+  }
+}

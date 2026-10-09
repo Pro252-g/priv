@@ -1,3 +1,4 @@
+import {objectBody} from './validation.mjs';
 import {randomBytes,createHash,scryptSync} from 'node:crypto';
 const digest=value=>createHash('sha256').update(value).digest('hex');
 export const ROLE_CAPABILITIES={
@@ -18,7 +19,7 @@ export function initializeAccess(db){
 }
 export function createAccess({db,fail,text}){
  const tenantId=user=>user.owner_id||user.id;
- const audit=(user,action,resource,details={})=>db.prepare('INSERT INTO audit_log(owner_id,actor_id,action,resource,details) VALUES(?,?,?,?,?)').run(tenantId(user),user.id,action,String(resource),JSON.stringify(details));
+ const audit=(user,action,resource,details={})=>db.prepare('INSERT INTO audit_log(owner_id,actor_id,action,resource,details) VALUES(?,?,?,?,?)').run(tenantId(user),user.id,action,String(resource),JSON.stringify({...details,...(user.keyId?{keyId:user.keyId}:{})}));
  const enrichUser=(id,key={})=>{const user=db.prepare('SELECT id,email,name,owner_id,role,disabled FROM users WHERE id=?').get(id);if(!user||user.disabled)return null;user.owner_id||=user.id;user.restaurantIds=user.role==='owner'?db.prepare('SELECT id FROM restaurants WHERE user_id=?').all(tenantId(user)).map(r=>r.id):db.prepare('SELECT restaurant_id FROM user_restaurants WHERE user_id=?').all(user.id).map(r=>r.restaurant_id);return {...user,...key};};
  const can=(user,cap,rid)=>!!user&&!user.disabled&&(ROLE_CAPABILITIES[user.role]||[]).includes(cap)&&(!user.keyScopes||user.keyScopes.includes(cap))&&(rid===undefined||rid===null||(user.role==='owner'||user.restaurantIds.includes(Number(rid)))&&(!user.keyRestaurantIds||user.keyRestaurantIds.includes(Number(rid))));
  const demand=(user,cap,rid)=>{if(!can(user,cap,rid))fail(403,'Permission denied: '+cap);};
@@ -28,7 +29,7 @@ export function createAccess({db,fail,text}){
  const resolveApiKey=req=>{if(!req.headers.authorization)return null;const token=/^Bearer (iep_[a-f0-9]{64})$/.exec(req.headers.authorization)?.[1];if(!token)fail(401,'Invalid API authentication');const key=db.prepare('SELECT * FROM integration_keys WHERE token_hash=? AND revoked_at IS NULL').get(digest(token));if(!key||Date.parse(key.expires_at)<=Date.now())fail(401,'API key expired or revoked');const user=enrichUser(key.user_id,{keyId:key.id,keyScopes:JSON.parse(key.scopes),keyRestaurantIds:JSON.parse(key.restaurant_ids)});if(!user)fail(401,'Account disabled');return user;};
  function requestRestaurant({p,body,url,user}){
   let m=p.match(/^\/api\/dishes\/(\d+)/);if(m)return dish(m[1],user).restaurant_id;
-  for(const [pattern,table] of [[/^\/api\/experiments\/(\d+)/,'experiments'],[/^\/api\/monitor\/(\d+)/,'monitors'],[/^\/api\/events\/(\d+)/,'events'],[/^\/api\/samples\/(\d+)/,'samples']]){m=p.match(pattern);if(m){const row=table==='samples'?db.prepare('SELECT d.restaurant_id FROM samples s JOIN dishes d ON d.id=s.dish_id WHERE s.id=?').get(Number(m[1])):db.prepare(`SELECT restaurant_id FROM ${table} WHERE id=?`).get(Number(m[1]));if(!row)fail(404,'Resource not found');return restaurant(row.restaurant_id,user).id;}}
+  for(const [pattern,table] of [[/^\/api\/sources\/(\d+)/,'sources'],[/^\/api\/experiments\/(\d+)/,'experiments'],[/^\/api\/monitor\/(\d+)/,'monitors'],[/^\/api\/events\/(\d+)/,'events'],[/^\/api\/samples\/(\d+)/,'samples']]){m=p.match(pattern);if(m){const row=table==='samples'?db.prepare('SELECT d.restaurant_id FROM samples s JOIN dishes d ON d.id=s.dish_id WHERE s.id=?').get(Number(m[1])):db.prepare(`SELECT restaurant_id FROM ${table} WHERE id=?`).get(Number(m[1]));if(!row)fail(404,'Resource not found');return restaurant(row.restaurant_id,user).id;}}
   if(body.restaurantId!==undefined||url.searchParams.has('restaurantId'))return restaurant(body.restaurantId??url.searchParams.get('restaurantId'),user).id;
  }
  function authorizeRequest(ctx){const{p,method,body,user}=ctx;if(!p.startsWith('/api/')||['/api/me','/api/access','/api/openapi','/api/status'].includes(p))return;
@@ -36,8 +37,10 @@ export function createAccess({db,fail,text}){
   let capability;if(p==='/api/restaurants')capability=method==='GET'?'catalog.read':'restaurants.write';
   else if(/^\/api\/(dishes|samples)(\/|$)/.test(p))capability=method==='GET'?'catalog.read':'catalog.write';
   else if(/^\/api\/reports/.test(p)||/^\/api\/events\/\d+\/snapshot$/.test(p))capability='reports.read';
-  else if(p==='/api/events'){if(!Array.isArray(body.events))fail(400,'Provide an events array');for(const event of body.events||[])demand(user,event.mode==='manual'?'events.manual':'events.write');capability=(body.events||[]).every(e=>e.mode==='manual')?'events.manual':'events.write';}
+  else if(p==='/api/events'){if(!Array.isArray(body.events))fail(400,'Provide an events array');for(const event of body.events||[])demand(user,objectBody(event,'event').mode==='manual'?'events.manual':'events.write');capability=(body.events||[]).every(e=>e.mode==='manual')?'events.manual':'events.write';}
   else if(/^\/api\/experiments/.test(p))capability='experiments.run';
+  else if(/^\/api\/sources/.test(p))capability=method==='GET'?'monitor.read':/\/(health|gaps|lease)$/.test(p)?'monitor.write':'integrations.manage';
+  else if(/^\/api\/model-profiles/.test(p))capability=method==='GET'?'catalog.read':'integrations.manage';
   else if(/^\/api\/monitor/.test(p))capability=method==='GET'?'monitor.read':'monitor.write';
   else if(p==='/api/pos')capability=method==='GET'?'pos.read':'pos.write';
   else if(p==='/api/reconciliation')capability='pos.read';

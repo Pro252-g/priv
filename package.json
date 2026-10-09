@@ -1,6 +1,6 @@
 {
   "name": "iep-dish-counter",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "private": true,
   "type": "module",
   "engines": {
@@ -9,7 +9,8 @@
   "scripts": {
     "start": "node server/index.mjs",
     "test": "node --test tests/*.test.js server/*.test.mjs",
-    "test:browser": "node scripts/browser-workflow-check.mjs && node tests/frontend-regression.mjs && node tests/frontend-frozen-regression.mjs && node scripts/browser-admin-check.mjs && node scripts/browser-recognition-check.mjs",
+    "test:browser": "node scripts/browser-workflow-check.mjs && node tests/frontend-regression.mjs && node tests/frontend-frozen-regression.mjs && node scripts/browser-admin-check.mjs && node scripts/browser-recognition-check.mjs && node tests/frontend-audit-regression.mjs",
+    "test:edge": ".local/edge-venv/bin/python -m unittest discover -s edge -p 'test_*.py' -v",
     "test:models": "node scripts/model-smoke.mjs",
     "bench:capacity": "node scripts/benchmark-capacity.mjs",
     "backup": "node scripts/backup-data.mjs"

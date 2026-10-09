@@ -3,3 +3,11 @@ node_modules
 .local/*
 !.local/models
 .env
+.env.*
+**/*.env
+**/secrets/
+**/*credentials*
+*.log
+tests
+docs
+edge

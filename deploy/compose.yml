@@ -1,0 +1,107 @@
+name: iep
+x-api: &api
+  image: iep-api:${IEP_IMAGE_TAG:-local}
+  build:
+    context: ..
+    dockerfile: Dockerfile
+  env_file:
+    - path: ${IEP_API_ENV_FILE:-/etc/iep/api.env}
+      format: raw
+  environment:
+    HOST: 0.0.0.0
+    PORT: "3000"
+    IEP_DATA_DIR: /data
+    IEP_MEDIA_DIR: /media
+    IEP_MODELS_DIR: /app/.local/models
+    IEP_SECURE_COOKIE: "true"
+    IEP_TRUSTED_PROXY_IPS: ${IEP_PROXY_IP:-172.30.55.3}
+  user: "1000:1000"
+  init: true
+  read_only: true
+  tmpfs:
+    - /tmp:size=128m,mode=1777
+  cap_drop:
+    - ALL
+  security_opt:
+    - no-new-privileges:true
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "3"
+services:
+  api:
+    <<: *api
+    restart: unless-stopped
+    stop_grace_period: 30s
+    mem_limit: 2g
+    cpus: 2.0
+    volumes:
+      - api_data:/data
+      - api_media:/media
+    networks:
+      backend:
+        ipv4_address: ${IEP_API_IP:-172.30.55.2}
+  proxy:
+    image: iep-proxy:${IEP_IMAGE_TAG:-local}
+    build:
+      context: .
+      dockerfile: Caddy.Dockerfile
+    user: "1000:1000"
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp:size=32m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      IEP_DOMAIN: ${IEP_DOMAIN:?Set IEP_DOMAIN to your public DNS hostname}
+      IEP_TLS_EMAIL: ${IEP_TLS_EMAIL:?Set IEP_TLS_EMAIL for certificate notifications}
+    ports:
+      - "80:8080"
+      - "443:8443"
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      backend:
+        ipv4_address: ${IEP_PROXY_IP:-172.30.55.3}
+      public: {}
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://api:3000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+  backup:
+    <<: *api
+    profiles: [maintenance]
+    command: ["sh", "/app/deploy/cloud-backup.sh"]
+    volumes:
+      - api_data:/data
+      - api_media:/media
+      - api_backups:/backups
+    networks:
+      - backend
+networks:
+  backend:
+    internal: true
+    ipam:
+      config:
+        - subnet: ${IEP_NETWORK_SUBNET:-172.30.55.0/24}
+  public: {}
+volumes:
+  api_data: {}
+  api_media: {}
+  api_backups: {}
+  caddy_data: {}
+  caddy_config: {}

@@ -1,0 +1,21 @@
+{
+	email {$IEP_TLS_EMAIL}
+	http_port 8080
+	https_port 8443
+	auto_https disable_redirects
+	admin off
+}
+
+http://{$IEP_DOMAIN}:8080 {
+	redir https://{$IEP_DOMAIN}{uri} permanent
+}
+
+https://{$IEP_DOMAIN}:8443 {
+	encode zstd gzip
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "same-origin"
+	}
+	reverse_proxy api:3000
+}
