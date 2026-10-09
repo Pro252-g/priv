@@ -1,0 +1,182 @@
+{
+  "reviewedAtUtc": "2026-10-09T07:56:36.492544+00:00",
+  "sourceCommit": "ecbcb662a8be4a1df9d46e10274e8c26d4f57591",
+  "applicationVersion": "0.3.0",
+  "scope": "Engineering audit and updated documentation; application code not changed by this review",
+  "checks": [
+    {
+      "command": "npm test",
+      "exitCode": 0,
+      "tests": 41,
+      "passed": 41,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "command": "npm run test:browser",
+      "exitCode": 0,
+      "completedScripts": 5,
+      "detection": "Explicit synthetic fixtures; pipeline and UI verification, not restaurant accuracy"
+    },
+    {
+      "command": "npm run test:models",
+      "exitCode": 0,
+      "sha256VerifiedModels": [
+        "mobilenet",
+        "detector"
+      ],
+      "actualCpuInferenceFrames": 3,
+      "embeddingDimensions": 1280
+    },
+    {
+      "command": "npm run bench:capacity",
+      "exitCode": 0,
+      "artifact": "capacity-2026-10-09.json",
+      "limitations": "Metadata-only DB; bounded model latency probe; not multi-tenant load or 24h endurance"
+    },
+    {
+      "command": "npm audit --json --omit=dev",
+      "exitCode": 1,
+      "severityCounts": {
+        "moderate": 3,
+        "high": 0,
+        "critical": 0
+      },
+      "uniqueAdvisory": "GHSA-hp3w-g68c-fv3c",
+      "dependencyPath": "@tensorflow/tfjs -> argparse -> sprintf-js@1.0.3",
+      "automaticFixAvailable": false,
+      "reachability": "No remote application exploit demonstrated; CLI dependency usage needs assessment before remediation"
+    }
+  ],
+  "confirmedDiagnosticObservations": [
+    {
+      "name": "known_unknown_same_identity",
+      "knownPlusConfirmedUnknownTotal": 2,
+      "expectedPhysicalIdentityCount": 1
+    },
+    {
+      "name": "live_experiment_string_namespace_collision",
+      "experimentalInserted": 0,
+      "experimentalDuplicates": 1,
+      "experimentalReportTotal": 0
+    },
+    {
+      "name": "duplicate_payload_conflict",
+      "changedDishTimeModeResponse": 200,
+      "duplicates": 1,
+      "originalRetained": true
+    },
+    {
+      "name": "null_occurredAt",
+      "knownStatus": 200,
+      "unknownStatus": 200,
+      "storedTime": "1970-01-01T00:00:00.000Z"
+    },
+    {
+      "name": "archived_item_policy",
+      "directEventStatus": 409,
+      "unknownConfirmationStatus": 200
+    },
+    {
+      "name": "reference_audit",
+      "auditCountBefore": 1,
+      "auditCountAfterUploadDelete": 1
+    },
+    {
+      "name": "reverse_proxy_login_quota",
+      "differentForwardedHeadersSameSocketAttempt11": 429,
+      "productionProxyTested": false
+    },
+    {
+      "name": "delayed_camera_permission_restaurant_switch",
+      "cameraBeforeRelease": "stopped",
+      "cameraAfterRelease": "running",
+      "monitorForNewRestaurant": "active",
+      "browserFixture": "Fake camera and synthetic detector; no physical device"
+    },
+    {
+      "name": "tracker_cadence",
+      "observations": 4,
+      "results": [
+        {
+          "intervalMs": 200,
+          "count": 1,
+          "trackIds": [
+            "1",
+            "1",
+            "1",
+            "1"
+          ]
+        },
+        {
+          "intervalMs": 1868,
+          "count": 0,
+          "trackIds": [
+            "1",
+            "2",
+            "3",
+            "4"
+          ]
+        },
+        {
+          "intervalMs": 5211,
+          "count": 0,
+          "trackIds": [
+            "1",
+            "2",
+            "3",
+            "4"
+          ]
+        }
+      ],
+      "method": "Known synthetic detections, fixed camera, actual tracker"
+    },
+    {
+      "name": "storage_public_misconfiguration",
+      "dataDirUnderPublicUnauthenticatedStatus": 200,
+      "databaseHeader": "SQLite format 3",
+      "mediaSymlinkToPublicUnauthenticatedStatus": 200,
+      "scope": "Temporary app copy; requires OS/storage misconfiguration, not ordinary API exploit"
+    },
+    {
+      "name": "pending_media_restoration",
+      "backupComplete": true,
+      "copiedImages": 1,
+      "catalogStatus": "pending",
+      "authenticatedImageGET": 200
+    },
+    {
+      "name": "data_permissions_under_umask022",
+      "directory": "0755",
+      "database": "0644",
+      "scope": "Local host risk, default supplied environment used umask077"
+    },
+    {
+      "name": "media_update_query_plan",
+      "rows": 1000000,
+      "before": "SCAN events",
+      "afterTemporaryDiagnosticIndex": "Indexed lookup",
+      "applicationSourceModified": false
+    }
+  ],
+  "staticFindings": [
+    "Running experiment settings differ from persisted provenance",
+    "Photo history renders event report instead of saved presence summary",
+    "Image_key indexes absent on media reference tables",
+    "Full DB hash loads database file into memory; verification scans refs per image",
+    "Unknown and monitor history bounds; unpaginated experiment history",
+    "No general COCO plate class and no reference-driven detector training"
+  ],
+  "notValidated": [
+    "Real restaurant recognition accuracy",
+    "Physical Android camera",
+    "Hikvision/NVR/RTSP/ONVIF connector",
+    "GPU acceleration on target hardware",
+    "Production HTTPS hosting",
+    "Docker build/runtime",
+    "Physical power-loss durability",
+    "Production off-host backup schedule/RPO/RTO",
+    "Continuous full-shift/24h run"
+  ],
+  "credentials": "Diagnostics used temporary random credentials that were not recorded; no restaurant production data"
+}

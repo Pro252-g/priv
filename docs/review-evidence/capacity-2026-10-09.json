@@ -1,0 +1,239 @@
+{
+  "generatedAt": "2026-10-09T07:51:56.445Z",
+  "method": "Bounded synthetic workload, real models. No restaurant accuracy, 24h endurance, mobile-device, or multi-client test implied.",
+  "resources": {
+    "node": "v24.19.0",
+    "architecture": "x64",
+    "cpuModel": "AMD EPYC 9V74 80-Core Processor",
+    "visibleCpuCount": 5,
+    "cgroupCpuMax": "400000 100000",
+    "cgroupMemoryMax": "34359738368",
+    "hostTotalMemoryBytes": 35743784960,
+    "hostFreeMemoryBytes": 34686222336
+  },
+  "database": [
+    {
+      "rows": 100000,
+      "eventsPerDay": 5000,
+      "catalogItems": 20,
+      "days": 20,
+      "snapshots": false,
+      "insertedRows": 100000,
+      "insertMs": 370.157406,
+      "selectedDay": "2026-01-20",
+      "returnedEventsLimit": 1000,
+      "reconciliation": {
+        "samples": 5,
+        "meanMs": 6.728672199999982,
+        "p50Ms": 6.281110000000012,
+        "p95Ms": 8.160532999999987,
+        "maxMs": 8.160532999999987
+      },
+      "report": {
+        "samples": 5,
+        "meanMs": 10.48358119999998,
+        "p50Ms": 10.539258999999902,
+        "p95Ms": 12.117418000000043,
+        "maxMs": 12.117418000000043
+      },
+      "sqliteBytes": {
+        "main": 16195584,
+        "-wal": 0,
+        "-shm": 32768
+      },
+      "nodeMemory": {
+        "rss": 107380736,
+        "heapTotal": 21934080,
+        "heapUsed": 16368000,
+        "external": 6593051,
+        "arrayBuffers": 2551128
+      }
+    },
+    {
+      "rows": 1000000,
+      "eventsPerDay": 5000,
+      "catalogItems": 20,
+      "days": 200,
+      "snapshots": false,
+      "insertedRows": 900000,
+      "insertMs": 3324.818824,
+      "selectedDay": "2026-07-19",
+      "returnedEventsLimit": 1000,
+      "reconciliation": {
+        "samples": 5,
+        "meanMs": 4.948656400000073,
+        "p50Ms": 4.86841000000004,
+        "p95Ms": 5.215052000000014,
+        "maxMs": 5.215052000000014
+      },
+      "report": {
+        "samples": 5,
+        "meanMs": 8.251641999999901,
+        "p50Ms": 8.481225999999879,
+        "p95Ms": 8.724191999999675,
+        "maxMs": 8.724191999999675
+      },
+      "sqliteBytes": {
+        "main": 162484224,
+        "-wal": 0,
+        "-shm": 32768
+      },
+      "nodeMemory": {
+        "rss": 135651328,
+        "heapTotal": 49537024,
+        "heapUsed": 23931192,
+        "external": 8777280,
+        "arrayBuffers": 4735317
+      }
+    }
+  ],
+  "inference": [
+    {
+      "backend": "cpu",
+      "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+      "canvas": {
+        "width": 640,
+        "height": 360
+      },
+      "modelLoadMs": 2761.2999999970198,
+      "warmupIterations": 1,
+      "detector": {
+        "samples": 5,
+        "meanMs": 1783.9200000017881,
+        "p50Ms": 1804.5999999940395,
+        "p95Ms": 1830.1000000089407,
+        "maxMs": 1830.1000000089407
+      },
+      "oneEmbedding": {
+        "samples": 5,
+        "meanMs": 809,
+        "p50Ms": 778.2000000029802,
+        "p95Ms": 984.5,
+        "maxMs": 984.5
+      },
+      "fourEmbeddings": {
+        "samples": 5,
+        "meanMs": 3076.6799999982118,
+        "p50Ms": 3025.9000000059605,
+        "p95Ms": 3391.7000000029802,
+        "maxMs": 3391.7000000029802
+      },
+      "detectorPlusFour": {
+        "samples": 5,
+        "meanMs": 4860.6,
+        "p50Ms": 4770.79999999702,
+        "p95Ms": 5196.29999999702,
+        "maxMs": 5196.29999999702
+      },
+      "tensorMemoryBefore": {
+        "unreliable": true,
+        "reasons": [
+          "The reported memory is an upper bound. Due to automatic garbage collection, the true allocated memory may be less."
+        ],
+        "numTensors": 387,
+        "numDataBuffers": 387,
+        "numBytes": 32019468
+      },
+      "tensorMemoryAfter": {
+        "unreliable": true,
+        "reasons": [
+          "The reported memory is an upper bound. Due to automatic garbage collection, the true allocated memory may be less."
+        ],
+        "numTensors": 387,
+        "numDataBuffers": 387,
+        "numBytes": 32019468
+      },
+      "browserJsHeap": {
+        "used": 88687790,
+        "total": 100761126
+      },
+      "limitations": "Synthetic pixels; 4 forced crop embeddings rather than detection/classification accuracy; excludes video decode/seek, reference cosine matching, tracking, server/network writes and thermals."
+    },
+    {
+      "backend": "webgl",
+      "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+      "canvas": {
+        "width": 640,
+        "height": 360
+      },
+      "modelLoadMs": 5594.5,
+      "warmupIterations": 1,
+      "detector": {
+        "samples": 5,
+        "meanMs": 549.9200000047683,
+        "p50Ms": 549.6000000089407,
+        "p95Ms": 564.8000000119209,
+        "maxMs": 564.8000000119209
+      },
+      "oneEmbedding": {
+        "samples": 5,
+        "meanMs": 235.45999999642373,
+        "p50Ms": 234.3999999910593,
+        "p95Ms": 261.09999999403954,
+        "maxMs": 261.09999999403954
+      },
+      "fourEmbeddings": {
+        "samples": 5,
+        "meanMs": 968.1999999970197,
+        "p50Ms": 959.5,
+        "p95Ms": 1049.2999999970198,
+        "maxMs": 1049.2999999970198
+      },
+      "detectorPlusFour": {
+        "samples": 5,
+        "meanMs": 1518.1200000017882,
+        "p50Ms": 1520.7000000029802,
+        "p95Ms": 1614.1000000089407,
+        "maxMs": 1614.1000000089407
+      },
+      "tensorMemoryBefore": {
+        "unreliable": false,
+        "numBytesInGPU": 33096080,
+        "numBytesInGPUAllocated": 240673076,
+        "numBytesInGPUFree": 207576996,
+        "numTensors": 387,
+        "numDataBuffers": 387,
+        "numBytes": 32019468
+      },
+      "tensorMemoryAfter": {
+        "unreliable": false,
+        "numBytesInGPU": 33096080,
+        "numBytesInGPUAllocated": 250314020,
+        "numBytesInGPUFree": 217217940,
+        "numTensors": 387,
+        "numDataBuffers": 387,
+        "numBytes": 32019468
+      },
+      "browserJsHeap": {
+        "used": 51188816,
+        "total": 63128732
+      },
+      "limitations": "Synthetic pixels; 4 forced crop embeddings rather than detection/classification accuracy; excludes video decode/seek, reference cosine matching, tracking, server/network writes and thermals."
+    }
+  ],
+  "modelFiles": {
+    "mobilenet": {
+      "source": "https://storage.googleapis.com/tfjs-models/savedmodel/mobilenet_v2_1.0_224/",
+      "verified_upstream_md5": true,
+      "sha256": {
+        "group1-shard1of4": "b837ab72b76b59e217750e0afed94b8f877fce7fff71b8d9cead71fc11612d8c",
+        "group1-shard2of4": "4b9b02a59ecfea1a698a576f1400e876170ef78abe0e06b16195ebfe2983f6d5",
+        "group1-shard3of4": "fab6533531d17b78ad67223c82d9a452263ccc4d309a20db91a5de3714aa6a00",
+        "group1-shard4of4": "617fd3639ac5cfb94a971bef032fcdfa7690816d524117f54a9cc693d0b2c5f4",
+        "model.json": "12e180771864a87473ae06988b8564d9fd077b11c1854030e90509917203cf6f"
+      }
+    },
+    "detector": {
+      "source": "https://storage.googleapis.com/tfjs-models/savedmodel/ssdlite_mobilenet_v2/",
+      "verified_upstream_md5": true,
+      "sha256": {
+        "group1-shard1of5": "0e7af0f713e98521252321f7f84892c31cefccccec3ac64c84e5065b75ed5646",
+        "group1-shard2of5": "74cc6cfc2c4510c9cd81b8ad4cebf6f6a8f305119bb365ce0eb96276da38519a",
+        "group1-shard3of5": "50383033f893eae136392a403e8f70ade5efd90867df5695c4ca5ac640e14f38",
+        "group1-shard4of5": "d856dc534c780068bbf6c666ce1516df2c8433d87578aa31fcdf197de7058cc2",
+        "group1-shard5of5": "3d356f1fb6dfca6af78c56db34d9326706d0196e303f9de6b04f236ca79ed309",
+        "model.json": "3770b2528339b1e3340cb74360e1e40401816b009779aeb8d0cce3a4353ea3a9"
+      }
+    }
+  }
+}
