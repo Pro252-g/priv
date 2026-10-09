@@ -4,18 +4,26 @@
  */
 export class DishTracker {
   constructor(options = {}) {
-    this.options = { lineY: 0.5, direction: 'down', minObservations: 3, maxMissingMs: 1500, maxDistance: 0.18, hysteresis: 0.015, ...options };
+    this.options = { lineY: 0.5, direction: 'down', minObservations: 3, maxMissingMs: 1500, maxDistance: 0.18, hysteresis: 0.015, candidateTtlMs: 1500, ...options };
     this.reset();
   }
   configure(options) { Object.assign(this.options, options); }
   reset() {
     this.sessionId = globalThis.crypto?.randomUUID?.() || `session-${Date.now()}-${Math.random().toString(36).slice(2)}`;
     this.nextId = 1;
+    this.lastTimestamp = null;
     this.tracks = [];
   }
   update(detections, timestamp = Date.now(), cameraStable = true) {
+    timestamp = Number.isFinite(timestamp) ? timestamp : (this.lastTimestamp ?? Date.now());
+    timestamp = Math.max(timestamp, this.lastTimestamp ?? timestamp);
+    this.lastTimestamp = timestamp;
+    const unknownEvents = [];
     this.cameraStable = cameraStable;
-    if (!cameraStable) this.tracks.forEach(t => { t.side = null; });
+    if (!cameraStable) this.tracks.forEach(t => { t.side = null; t.pending = null; });
+    this.tracks.forEach(t => {
+      if (t.pending && (timestamp - t.pending.timestamp >= this.options.candidateTtlMs || timestamp - t.lastSeen > this.options.maxMissingMs)) this.review(t, unknownEvents, 'confirmation-timeout');
+    });
     this.tracks = this.tracks.filter(t => timestamp - t.lastSeen <= this.options.maxMissingMs);
     const valid = detections.filter(d => Array.isArray(d.bbox) && d.bbox.length === 4 && d.bbox.every(Number.isFinite) && d.bbox[2] > 0 && d.bbox[3] > 0);
     const candidates = [];
@@ -24,7 +32,7 @@ export class DishTracker {
       const elapsed = Math.max(0, timestamp - t.lastSeen);
       const c = center(d.bbox), old = center(t.bbox);
       const predicted = [old[0] + t.velocity[0] * Math.min(elapsed, 500), old[1] + t.velocity[1] * Math.min(elapsed, 500)];
-      const distance = Math.hypot(c[0] - predicted[0], c[1] - predicted[1]);
+      const distance = Math.min(Math.hypot(c[0] - predicted[0], c[1] - predicted[1]), Math.hypot(c[0] - old[0], c[1] - old[1]));
       const overlap = iou(t.bbox, d.bbox);
       if (distance <= this.options.maxDistance || overlap > 0.1) {
         const conflict = t.dishId && d.dishId && t.dishId !== d.dishId ? 0.25 : 0;
@@ -37,21 +45,25 @@ export class DishTracker {
     for (const { ti, di } of candidates) {
       if (matchedTracks.has(ti) || matchedDetections.has(di)) continue;
       matchedTracks.add(ti); matchedDetections.add(di);
-      this.observe(this.tracks[ti], valid[di], timestamp, events);
+      this.observe(this.tracks[ti], valid[di], timestamp, events, unknownEvents);
     }
     valid.forEach((d, di) => {
       if (matchedDetections.has(di)) return;
       const t = { id: String(this.nextId++), bbox: [...d.bbox], velocity: [0, 0], lastSeen: timestamp, observations: 0, stableObservations: 0, counted: false, side: null, dishId: null };
       this.tracks.push(t);
-      this.observe(t, d, timestamp, events);
+      this.observe(t, d, timestamp, events, unknownEvents);
     });
-    return { tracks: this.tracks.filter(t => t.lastSeen === timestamp).map(t => ({ ...t, bbox: [...t.bbox] })), events };
+    this.tracks.forEach((t, index) => {
+      if (!matchedTracks.has(index) && t.lastSeen !== timestamp && t.pending) this.review(t, unknownEvents, 'visibility-lost');
+    });
+    return { tracks: this.tracks.filter(t => t.lastSeen === timestamp).map(t => ({ ...t, bbox: [...t.bbox] })), events, unknownEvents };
   }
-  observe(t, d, timestamp, events) {
+  observe(t, d, timestamp, events, unknownEvents) {
     const previous = center(t.bbox), current = center(d.bbox);
     const delta = timestamp - t.lastSeen;
     if (delta > 0) t.velocity = [(current[0] - previous[0]) / delta, (current[1] - previous[1]) / delta];
     t.bbox = [...d.bbox]; t.lastSeen = timestamp; t.observations++;
+    const previousDishId = t.dishId;
     const dishId = d.dishId && d.dishId !== 'unknown' ? d.dishId : null;
     t.stableObservations = dishId && dishId === t.dishId ? t.stableObservations + 1 : dishId ? 1 : 0;
     t.dishId = dishId; t.dishName = d.dishName || ''; t.confidence = d.confidence ?? null;
@@ -60,14 +72,27 @@ export class DishTracker {
     if (side !== null) {
       if (t.side !== null && side !== t.side) {
         const direction = side === 1 ? 'down' : 'up';
-        if (!t.counted && dishId && t.stableObservations >= this.options.minObservations && (this.options.direction === 'both' || this.options.direction === direction)) {
-          t.counted = true;
-          const dedupeKey = `${this.sessionId}:${t.id}`;
-          events.push({ id: dedupeKey, dedupeKey, sessionId: this.sessionId, trackId: t.id, dishId, dishName: t.dishName, timestamp, direction, confidence: t.confidence, bbox: [...t.bbox] });
+        if (t.pending) this.review(t, unknownEvents, 'returned-before-confirmation');
+        if (!t.counted && !t.reviewed && (this.options.direction === 'both' || this.options.direction === direction)) {
+          t.pending = { dishId: previousDishId === dishId ? dishId : null, dishName: t.dishName, timestamp, direction, confidence: t.confidence, bbox: [...t.bbox] };
         }
       }
       t.side = side;
     }
+    if (t.pending && t.pending.dishId !== dishId) this.review(t, unknownEvents, 'classification-changed');
+    if (t.pending && dishId && t.stableObservations >= this.options.minObservations) {
+      t.counted = true;
+      const dedupeKey = `${this.sessionId}:${t.id}`;
+      const confidence = Number.isFinite(t.pending.confidence) && Number.isFinite(t.confidence) ? Math.min(t.pending.confidence, t.confidence) : null;
+      events.push({ ...t.pending, id: dedupeKey, dedupeKey, sessionId: this.sessionId, trackId: t.id, confidence });
+      t.pending = null;
+    }
+  }
+  review(t, unknownEvents, reason) {
+    const dedupeKey = `${this.sessionId}:${t.id}:review`;
+    unknownEvents.push({ ...t.pending, dishId: null, dishName: '', id: dedupeKey, dedupeKey, sessionId: this.sessionId, trackId: t.id, counted: false, reviewRequired: true, reason });
+    t.pending = null;
+    t.reviewed = true;
   }
 }
 function center(b) { return [b[0] + b[2] / 2, b[1] + b[3] / 2]; }

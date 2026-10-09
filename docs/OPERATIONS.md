@@ -1,29 +1,63 @@
-# Recorded-video pilot, cashier comparison, and continuity
+# تشغيل الفيديو والكاشير والمراجعة والتعافي
 
-## Source of truth
-Camera recognition is an observation with errors. A difference against cashier quantities is a review signal, never evidence assigning theft or blame. Matching by daily totals cannot identify which order was missing. Validate scene coverage, refunds, complimentary items, waste, returned plates, delayed orders, time boundary and model errors before investigating a discrepancy.
+## ما تقوله النتيجة
 
-The current pilot imports summary expected quantities. Automated POS integration needs the POS name/export specification or read-only API access. The preferred future integration receives stable order and line IDs, item codes, quantities, status changes, restaurant and timestamp; it deduplicates by source ID, maps cashier item codes to the catalog, and matches dispatch windows. Do not read customer payment/card data for dish counting.
+العد المرصود قد يخطئ. فرق الكاشير حالة تشغيل تحتاج مراجعة، وليس إثبات سرقة أو مسؤولية شخص. إجمالي اليوم لا يحدد الطلب المفقود. راجع الإلغاء والمرتجع والمجاني وطعام العاملين والهالك والأحجام والكومبو وتوقيت الخروج وحجب الرؤية وأخطاء النموذج. [تقرير السعة والتشغيل](CAPACITY_AND_OPERATIONS.md) يتناول واقع نقطتي الخروج والأجهزة والتخزين.
 
-## Power and interrupted monitoring
-SQLite and uploaded sample/snapshot files are on persistent storage. An abrupt outage cannot generate records during the outage. A monitoring heartbeat helps discover unexpected silence; its last received timestamp is an approximate bound, not the exact outage time or proof that electricity was the cause. Frozen video, disconnected camera, hidden browser tabs, model failures and service restarts must not appear as verified zero exits. Daily comparison reports indicate incomplete/unverified coverage.
+النسخة الحالية تستورد توقعات يومية بكتابة أو CSV، وتوفر API لمراجعات POS. التكامل التلقائي على مستوى الطلب يحتاج مواصفات نظام الكاشير وخريطة SKU→أصناف وكميات مرئية، وأرقام order/line ثابتة وحالات وتوقيت؛ لم يُربط مزود كاشير بعينه. لا يلزم جمع بيانات بطاقات الدفع. [دليل التكامل](INTEGRATION_GUIDE.md) يوضح مسارات الربط المتوفرة وما يبقى على الموصل.
 
-Browser pending records use durable browser storage scoped to the signed-in owner; resend retains the original event identity so server deduplication prevents repeated counts. Storage eviction, cleared browser data, private browsing and unpowered disks can still cause loss. Pending records are not evidence that unseen exits were recorded. The final edge service should persist events locally before transmission and restart under an OS service manager.
+## تجربة فيديو قصيرة قبل اليوم الكامل
 
-Deploy UPS capacity for the camera(s), NVR, edge computer and relevant network switch/router; test runtime under the actual load. NVR recording and an indexed last-processed stream time would permit backfill only when footage exists; automatic NVR reconnect/backfill is not implemented in this pilot. Backfill must use immutable camera/time/object event keys and a reviewed overlap policy to avoid duplicates after restart. Unrecorded footage is irrecoverable.
+1. أضف أصنافًا وصورًا حقيقية متنوعة، وافتح «تجارب الفيديو». MP4/H.264 بداية مناسبة؛ دعم الملفات يعتمد على المتصفح. اختر وضعًا ثابتًا لعد العبور، أو متحركًا لملاحظات التعرف فقط.
+2. حدد بداية ونهاية الجزء بالثواني واضبط خط العبور من إعدادات العد. كل تجربة مستقلة، بما فيها إعادة تحليل الفيديو نفسه. بصمة الملف تُحسب على دفعات ١MiB لتجنب قراءة الملف كاملًا في الذاكرة؛ هي بصمة سلسلة chunks موثقة وليست SHA256 التقليدي للملف كله.
+3. المعالجة تأخذ إطارًا كل ٠٫٢ ثانية من زمن الفيديو. يمكنك إيقافها مؤقتًا واستكمالها داخل الصفحة. إغلاق الصفحة لا يستأنف التتبع تلقائيًا؛ أعد اختيار الملف وابدأ تجربة جديدة. بدء جزء من منتصف الفيديو لا يحفظ هوية ما سبقه، فيجب ترك وقت تمهيد قبل فترة القياس وتوثيق الحدود.
+4. الملف الأصلي يبقى على جهازك؛ يُحفظ وصف التجربة وبصمة الملف/النموذج وإعدادات العد ومعرفات المراجع والنتائج ولقطات الأحداث عند تفعيلها. وقت التحليل ليس وقت التصوير الحقيقي؛ `mediaTimeSec` هو توقيت الحدث داخل الفيديو.
+5. اكتمال تحليل الإطارات لا يعني وصول كل الأحداث للخادم. راجع طابور الإرسال والسجل المحفوظ؛ النتائج قد تكون معلّقة. الأحداث التجريبية لا تدخل التشغيل الحقيقي أو الكاشير.
 
-Maintain off-device backups, access control and restore drills. Do not copy only a live SQLite main file while its WAL has pending writes. Use SQLite's online backup API or stop the service and copy its complete data directory. Restrict access to images and set customer retention and disk quotas before commercial rollout.
+قارن الفيديو بعد بشري مستقل: ١ و٢ و٤ عناصر، صوانٍ وأيدٍ وتداخل وسرعة وعودة وإضاءة منخفضة وانقطاع. قِس الفقد والتكرار والتصنيف والمجهول منفصلة. لا تدرب/تضبط على الفيديو الوحيد ثم تعتبره اختبارًا مستقلًا.
 
-## Video experiments
-Recorded files are processed locally by the browser. Formats depend on browser support; MP4 H.264 is a practical first choice. Each new analysis is isolated from real operation and POS reconciliation. Experimental events preserve media position; the current date of analysis must not be represented as the real footage capture time. Keep the original file to inspect detections.
+الكاشف العام يدعم أوعية وأكوابًا وبعض الطعام، ولا يكتشف كل طبق مطعم. الصور المرجعية لا تُدرّب كاشفًا متخصصًا. حذف كشف الطعام المتداخل داخل الوعاء لا يعني ضمان فصل أطباق متداخلة. «مجهول» محفوظ فقط إذا اكتشف النظام العنصر وتتبعه وقرر عبوره؛ عنصر غائب عن الكشف لا ينتج حدثًا للمراجعة. محتوى مشروبات متطابقة بصريًا يحتاج ربطًا أو علامة.
 
-A file upload does not train a detector. Generic model support is limited; cups and wine glasses are experimental detections, not proof of drink contents. Real dish classification must be evaluated on unseen restaurant footage. Synthetic model tests show the computation executes, not restaurant accuracy.
+## حفظ الأحداث وتوقف المصدر
 
-Test 1, 2, and 4 simultaneous elements, trays, hands, overlap, speed, returns, low light and recording interruptions against independent human annotations. Count errors and classification errors separately. Choose a documented acceptance threshold before acceptance. Large gaps or ambiguous source footage make an end-of-day report inconclusive.
+التقاط الإطار يتم قبل التحليل بحيث ترتبط القصاصات واللقطة بنفس الإطار. التتبع يحتفظ بوقت العبور عند انتظار استقرار التصنيف، ويفصل حالات غير معروفة؛ هذا تحسين وظيفي لا ضمان هوية بعد اختفاء طويل أو عودة.
 
-## Executed pilot checks
-Ten Node tests passed, including experiment/live separation, customer isolation, POS revision replay, and monitor gap persistence across service restart. Chromium loaded the real local MobileNet and COCO models and executed inference on a synthetic frame; this does not measure accuracy.
+IndexedDB يحتفظ بطابور payload ثابت، مرتبط بالحساب والمطعم والتجربة، دون نسخ بيانات دخول. التسجيل المحلي يسبق الإرسال. الإرسال التلقائي منفصل عن تحليل الإطارات، ويعيد المحاولة بتأخير يصل ٦٠ ثانية، مع مفاتيح ثابتة يمنع الخادم تكرارها. تسجيل الدخول من جديد يفعّل إعادة إرسال أحداث الحساب؛ الحساب الآخر لا يستلم طابوره. زر إرسال المعلّق يسمح بالمحاولة الفورية.
 
-`scripts/browser-workflow-check.mjs` exercises MP4 input, four crossings with an explicit synthetic detector, experiment/live separation, POS entry/CSV mapping, and durable outbox resend after reload. It does not pretend its synthetic detections validate restaurant recognition. It requires optional Playwright, a Chromium executable, and an MP4 fixture at `.local/video-fixture.mp4`. Set `IEP_PLAYWRIGHT_PATH` to Playwright's absolute index.mjs and optionally `IEP_CHROMIUM_PATH`. Generate the fixture with FFmpeg: `ffmpeg -f lavfi -i color=c=white:s=320x240:r=10 -t 1.2 -c:v libx264 -pix_fmt yuv420p .local/video-fixture.mp4`. Then run `node scripts/browser-workflow-check.mjs`.
+الحد الحالي ١٠٠٠ حدث أو تقدير JSON ‏٦٤MiB؛ الحجم تقديري وقد يختلف عن مساحة IndexedDB الفعلية. عند بلوغ الحد تتوقف المعالجة مع تنبيه، ولا تُحذف أحداث قديمة لتغطية الامتلاء. clearing/eviction للتخزين أو private browsing أو انقطاع الجهاز قبل تثبيت الحدث قد يؤدي لفقد. لا توجد ضمانة استمرارية صناعية للمتصفح. يجب ألا يضاعف التأكيد اليدوي حدثًا عدَّه النظام بالفعل؛ استخدمه فقط لتسجيل خروج فعلي فائت.
 
-Manual observed events must be additional physical exits missed by automatic counting, not a second confirmation of already-counted exits. Currently there is no event correction ledger; manually double-counted exits can inflate reconciliation. A full customer rollout needs reviewed event corrections and unknown-crossing records.
+البث الحي يتحقق من تقدم إطارات المصدر عبر video frame callback أو عداد الفيديو/زمنه، ولا يعيد تحليل صورة متجمدة كأنها تغطية مستمرة. عدم وصول إطار حديث لنحو ١٥ ثانية أو عدم معالجة إطار لنحو ٣٠ ثانية يُبلَّغ كتعطل عند نبضة المراقبة التالية. نبضة اتصال لا تثبت صحة التعرف. بعض المصادر قد تعيد صورة جامدة بإطارات/timestamps جديدة؛ هذا الفحص لا يثبت كشف كل صور التجمد الممكنة.
+
+تُرسل نبضة أثناء التشغيل؛ الخادم يعتبر فقدها لأكثر من ٤٥ ثانية فجوة، ويحتفظ بفترات stalled/unknown بعد التعافي أو إعادة التشغيل. هوية المصدر المستقرة تختلف عن session جديدة؛ بدء جلسة جديدة لنفس المصدر يغلق القديمة لتحديد الفجوة. سبب unknown لا يثبت انقطاع الكهرباء. إخفاء صفحة الكاميرا يوقف الجلسة عمدًا، وإغلاقها أو إنهاء الكاميرا يتطلب بدء متابعة جديد. التقارير تؤكد أن التغطية غير معتمدة؛ حتى يوم بلا فجوات نبضات ليس دليل دقة أو تغطية الوردية بالكامل.
+
+## المطابقة اليومية وأرشفة الأصناف
+
+اختر المطعم والتاريخ وانتظر تحميل القيم، ثم اكتب أو استورد واحفظ. الواجهة تعزل الاستجابات بحسب المطعم واليوم، وتمنع حفظ جدول قديم أثناء الانتقال. عدم وجود revision يبدأ بقيم صفر تحتاج مراجعتك، وليس بيانات كاشير مؤكدة. CSV يجب أن يشمل كل الأصناف مرة واحدة لأن الحفظ بديل كامل لليوم؛ الأسماء المتكررة تستلزم `dishId`.
+
+التوقع = `sold − cancelled + complimentary + waste`؛ sold هو الإجمالي قبل الإلغاء، cancelled ما أُلغي قبل الخروج، complimentary مجاني خرج، waste هالك مرّ بمنطقة العد. لا تخصم استردادًا بعد خروج فعلي ولا تضف هالكًا بقي داخل المطبخ. هذه معادلة خاصة بنقطة خروج وليست جرد خامات.
+
+مراجعات POS محفوظة، وتكرار نفس revision/payload لا يضاعفها؛ استخدام revision نفسه بقيم مختلفة يعطي تعارضًا، وإعادة نسخة قديمة لا تجعلها الحالية. حدود اليوم UTC تُحسب من Africa/Cairo مع التوقيت الصيفي، ويُجمِّع الخادم يومًا مفهرسًا بدل قراءة التاريخ كله. اليوم الحالي تقويمي يبدأ منتصف الليل؛ وردية تبدأ ٤ صباحًا ليست إعدادًا مكتملًا بعد.
+
+DELETE لصنف يؤرشفه بدل إزالة تاريخ الأحداث. المكتبة النشطة تخفيه، والتقارير/المطابقة تحفظ معرفه وسياقه التاريخي، وأسماء الأصناف محفوظة في revisions. يمكن مزامنة أحداث سابقة لأرشفة الصنف، وتُرفض أحداث جديدة عند/بعد الأرشفة. تعديلات الأيام القديمة التي سبق أن تضمنت الصنف ممكنة عبر API ضمن قواعده، ولا يُضاف إلى يوم جديد باعتباره صنفًا نشطًا. لا تفترض أن كل عملية API للأرشفة/إدارة الصور لها زر مكتمل داخل المكتبة.
+
+## المخاطر والتصحيحات واعتماد المدير
+
+«إدارة المخاطر» يوفر قوالب مخاطر قابلة لتحديث الاحتمال والأثر والمسؤول والحالة والإجراء والدليل. الدرجات الأولية افتراضات تخطيطية وليست نسبًا مقاسة. مسؤول الإدخال والمهندس يستطيعان تحديث المخاطر ضمن نطاقهما؛ قبول الخطر أو إغلاقه واعتماد اليوم يحتاج مديرًا أو مالكًا.
+
+المدير يراجع عبورًا مجهولًا ويؤكد صنفه أو يستبعده بسبب موثق؛ تأكيد المجهول يسجل حدثًا يدويًا مرة واحدة، ولا يحوله إلى تعرف تلقائي ناجح. تصحيح حدث معروف يتم بـ`void` أو `reclassify` مع السبب والمستخدم والوقت، مع حفظ الأصل والتصحيحات. التقارير والمطابقة تعتمد آخر تصحيح؛ الأصل متاح للمراجعة ولا يصبح التعديل دليلًا مستقلًا على واقع لم تصوره الكاميرا.
+
+اعتماد اليومية مربوط بأحدث POS revision وسبب وإقرار صريح بأن التغطية غير مؤكدة. اليوم المعتمد يرفض تعديل POS حتى يعيد المدير فتحه؛ ظهور أحداث أو مجهول أو تصحيحات لاحقة يستدعي إعادة مراجعة. الاعتماد قرار مدير وليس إثبات عدم وجود خسائر. توزع الصلاحيات server-side بحسب الدور والمطاعم؛ اقرأ [الصلاحيات والمخاطر](RISK_AND_ACCESS.md). سجل التدقيق داخل قاعدة التطبيق، وليس سجلًا مقاومًا لتعديل مدير قاعدة البيانات؛ إجراءات تجارية أكثر صرامة تحتاج حماية إضافية.
+
+## الكهرباء والنسخ والاسترجاع
+
+UPS يغطي الكاميرات/PoE وNVR وجهاز المعالجة والشبكة، وتُختبر البطارية بالحمل الفعلي. انقطاع الكهرباء لا يولد أحداثًا خلال غياب التصوير. إذا احتفظ NVR بالتسجيل، يمكن لاحقًا backfill مع time/object keys وسياسة overlap تمنع التكرار؛ **موصل NVR وإعادة الاتصال والاسترجاع التلقائي لم تنفذ**. ما لم يُصوَّر غير قابل للاسترجاع.
+
+الخدمة النهائية داخل المطعم تحتاج إدارة OS وإقلاعًا تلقائيًا وحفظًا محليًا ومزامنة ومراقبة مساحة/حرارة. Docker الذي يبدأ خادم الويب لا يعيد تشغيل كاميرا المتصفح. تهيئة restart policy للخادم تعالج توقفه فقط. لا توجد تنبيهات بريد/SMS خارجية مكتملة؛ واجهة الحالة المفتوحة ليست نظام إنذار يصل للمسؤول بعد مغادرته.
+
+قاعدة SQLite تتضمن الصور المرجعية ولقطات الأحداث BLOB على storage دائم. احفظ نسخة خارج الجهاز واختبر استعادة. أثناء WAL استخدم online backup أو أوقف الخدمة وانسخ دليل البيانات كاملًا؛ لا تنسخ main SQLite وحده. طبّق احتفاظًا وحصصًا وأذونات صور عند النشر، وراقب امتلاء القرص؛ الحذف الآلي وسياسات احتفاظ العملاء ليست مكتملة.
+
+## الاختبارات والسعة
+
+`npm test` يتحقق من منطق الخادم والتتبع والصلاحيات والفصل والتصحيحات وحدود اليوم. `npm run test:browser` يختبر وظائف الواجهة والفيديو الاصطناعي وrace اليومية والطابور والتجمد وشاشات الإدارة؛ الكاشف الاصطناعي لا يقيس دقة مطعم. `npm run test:models` يفحص بصمات وتحميل النماذج الحقيقية وinference على إطارات اصطناعية. Chromium وPlaywright متطلبات اختبارات المتصفح، وليسا مطلوبين لخادم Docker الإنتاجي.
+
+القياس الحقيقي القصير في البيئة الحالية كشف +٤ قصاصات ≈٤٫٦٤s CPU أو١٫٥٣s SwiftShader برمجي. استقراء ٢٤ ساعة عند٥fps ≈٥٥٧/١٨٤ ساعة معالجة قبل تكاليف إضافية؛ لا يوجد اختبار تشغيل تلك المدة. التقارير سريعة على مليون صف بلا صور، لكن ذلك لا يثبت قدرة نموذج الرؤية أو تعدد العملاء. اقرأ [الأرقام والمنهج وحساب التخزين](CAPACITY_AND_OPERATIONS.md) قبل اختيار جهاز أو تجربة فيديو يوم كامل.

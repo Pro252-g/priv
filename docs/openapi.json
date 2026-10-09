@@ -1,0 +1,2843 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "IEP Vision Pilot API",
+    "version": "0.2.0",
+    "description": "Role and restaurant scoped. Daily totals are reconciliation signals, not proof of theft. Recorded experiments never enter live totals."
+  },
+  "servers": [
+    {
+      "url": "/"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "cookieAuth": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "iep_session"
+      },
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer"
+      }
+    },
+    "schemas": {
+      "Event": {
+        "type": "object",
+        "properties": {
+          "dishId": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "sessionId": {
+            "type": "string"
+          },
+          "trackId": {
+            "type": "string"
+          },
+          "crossingId": {
+            "type": "string"
+          },
+          "camera": {
+            "type": "string"
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "confidence": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "mode": {
+            "enum": [
+              "manual",
+              "automatic"
+            ]
+          },
+          "experimentId": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "mediaTimeSec": {
+            "type": "number",
+            "minimum": 0
+          },
+          "image": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "dishId",
+          "sessionId",
+          "trackId",
+          "crossingId",
+          "occurredAt",
+          "confidence"
+        ]
+      },
+      "UnknownEvent": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string"
+          },
+          "trackId": {
+            "type": "string"
+          },
+          "crossingId": {
+            "type": "string"
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "image": {
+            "type": "string"
+          },
+          "experimentId": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "mediaTimeSec": {
+            "type": "number",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "sessionId",
+          "trackId",
+          "crossingId",
+          "occurredAt"
+        ]
+      },
+      "PosItem": {
+        "type": "object",
+        "properties": {
+          "dishId": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "sold": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "cancelled": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "complimentary": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "waste": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "dishId"
+        ]
+      }
+    }
+  },
+  "paths": {
+    "/api/logout": {
+      "post": {
+        "summary": "إنهاء جلسة المتصفح",
+        "x-capability": "authenticated",
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Successful operation"
+          },
+          "201": {
+            "description": "Created where applicable"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Role/key scope denied"
+          },
+          "404": {
+            "description": "Resource not found or outside restaurant scope"
+          },
+          "409": {
+            "description": "Revision changed / closed day / already resolved"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/access": {
+      "get": {
+        "summary": "الأدوار ونطاقات المفتاح المتاحة",
+        "x-capability": "authenticated",
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Successful operation"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Role/key scope denied"
+          },
+          "404": {
+            "description": "Resource not found or outside restaurant scope"
+          },
+          "409": {
+            "description": "Revision changed / closed day / already resolved"
+          }
+        }
+      }
+    },
+    "/api/samples/{id}": {
+      "delete": {
+        "summary": "حذف صورة مرجعية",
+        "x-capability": "catalog.write",
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Role/key scope denied"
+          },
+          "404": {
+            "description": "Resource not found or outside restaurant scope"
+          },
+          "409": {
+            "description": "Revision changed / closed day / already resolved"
+          }
+        }
+      },
+      "get": {
+        "summary": "صورة مرجعية ضمن المطعم",
+        "x-capability": "catalog.read",
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Role/key scope denied"
+          },
+          "404": {
+            "description": "Resource not found or outside restaurant scope"
+          },
+          "409": {
+            "description": "Revision changed / closed day / already resolved"
+          }
+        }
+      }
+    },
+    "/api/events/{id}/snapshot": {
+      "get": {
+        "summary": "لقطة الحدث المحمية",
+        "x-capability": "reports.read",
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Role/key scope denied"
+          },
+          "404": {
+            "description": "Resource not found or outside restaurant scope"
+          },
+          "409": {
+            "description": "Revision changed / closed day / already resolved"
+          }
+        }
+      }
+    },
+    "/api/events/{id}/corrections": {
+      "get": {
+        "summary": "تاريخ تصحيح الحدث",
+        "x-capability": "reports.read",
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Role/key scope denied"
+          },
+          "404": {
+            "description": "Resource not found or outside restaurant scope"
+          },
+          "409": {
+            "description": "Revision changed / closed day / already resolved"
+          }
+        }
+      },
+      "post": {
+        "summary": "تصحيح مراجع مع بقاء الأصل",
+        "x-capability": "day.approve",
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation"
+          },
+          "201": {
+            "description": "Created where applicable"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Role/key scope denied"
+          },
+          "404": {
+            "description": "Resource not found or outside restaurant scope"
+          },
+          "409": {
+            "description": "Revision changed / closed day / already resolved"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "action": {
+                    "enum": [
+                      "void",
+                      "reclassify"
+                    ]
+                  },
+                  "dishId": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "reason": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "action",
+                  "reason"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/unknown-events/{id}/snapshot": {
+      "get": {
+        "summary": "لقطة عبور مجهول",
+        "x-capability": "reports.read",
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Role/key scope denied"
+          },
+          "404": {
+            "description": "Resource not found or outside restaurant scope"
+          },
+          "409": {
+            "description": "Revision changed / closed day / already resolved"
+          }
+        }
+      }
+    },
+    "/api/health": {
+      "get": {
+        "summary": "صحة خادم البيانات",
+        "x-capability": "public",
+        "security": [],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Successful operation"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Role/key scope denied"
+          },
+          "404": {
+            "description": "Resource not found or outside restaurant scope"
+          },
+          "409": {
+            "description": "Revision changed / closed day / already resolved"
+          }
+        }
+      }
+    },
+    "/api/login": {
+      "post": {
+        "summary": "دخول حساب المستخدم",
+        "x-capability": "public",
+        "security": [],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Successful operation"
+          },
+          "201": {
+            "description": "Created where applicable"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Role/key scope denied"
+          },
+          "404": {
+            "description": "Resource not found or outside restaurant scope"
+          },
+          "409": {
+            "description": "Revision changed / closed day / already resolved"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "type": "string"
+                  },
+                  "password": {
+                    "type": "string",
+                    "writeOnly": true
+                  }
+                },
+                "required": [
+                  "email",
+                  "password"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/me": {
+      "get": {
+        "summary": "الهوية والدور والمطاعم والصلاحيات",
+        "x-capability": "authenticated",
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Successful operation"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Role/key scope denied"
+          },
+          "404": {
+            "description": "Resource not found or outside restaurant scope"
+          },
+          "409": {
+            "description": "Revision changed / closed day / already resolved"
+          }
+        }
+      }
+    },
+    "/api/restaurants": {
+      "get": {
+        "summary": "المطاعم المسموح بها",
+        "x-capability": "catalog.read",
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Successful operation"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Role/key scope denied"
+          },
+          "404": {
+            "description": "Resource not found or outside restaurant scope"
+          },
+          "409": {
+            "description": "Revision changed / closed day / already resolved"
+          }
+        }
+      },
+      "post": {
+        "summary": "إنشاء مطعم",
+        "x-capability": "restaurants.write",
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Successful operation"
+          },
+          "201": {
+            "description": "Created where applicable"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Role/key scope denied"
+          },
+          "404": {
+            "description": "Resource not found or outside restaurant scope"
+          },
+          "409": {
+            "description": "Revision changed / closed day / already resolved"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "name"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/dishes": {
+      "get": {
+        "summary": "مكتبة الأصناف",
+        "x-capability": "catalog.read",
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "restaurantId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Role/key scope denied"
+          },
+          "404": {
+            "description": "Resource not found or outside restaurant scope"
+          },
+          "409": {
+            "description": "Revision changed / closed day / already resolved"
+          }
+        }
+      },
+      "post": {
+        "summary": "إنشاء صنف",
+        "x-capability": "catalog.write",
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Successful operation"
+          },
+          "201": {
+            "description": "Created where applicable"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Role/key scope denied"
+          },
+          "404": {
+            "description": "Resource not found or outside restaurant scope"
+          },
+          "409": {
+            "description": "Revision changed / closed day / already resolved"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "restaurantId": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "name": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "restaurantId",
+                  "name"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/dishes/{id}": {
+      "delete": {
+        "summary": "أرشفة صنف دون حذف تاريخه",
+        "x-capability": "catalog.write",
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Role/key scope denied"
+          },
+          "404": {
+            "description": "Resource not found or outside restaurant scope"
+          },
+          "409": {
+            "description": "Revision changed / closed day / already resolved"
+          }
+        }
+      }
+    },
+    "/api/dishes/{id}/samples": {
+      "post": {
+        "summary": "صورة مرجعية JPEG/PNG",
+        "x-capability": "catalog.write",
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation"
+          },
+          "201": {
+            "description": "Created where applicable"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Role/key scope denied"
+          },
+          "404": {
+            "description": "Resource not found or outside restaurant scope"
+          },
+          "409": {
+            "description": "Revision changed / closed day / already resolved"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "image": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "image"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/events": {
+      "post": {
+        "summary": "أحداث مؤكدة بمفاتيح تكرار ثابتة",
+        "x-capability": "events.write / events.manual",
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Successful operation"
+          },
+          "201": {
+            "description": "Created where applicable"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Role/key scope denied"
+          },
+          "404": {
+            "description": "Resource not found or outside restaurant scope"
+          },
+          "409": {
+            "description": "Revision changed / closed day / already resolved"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "restaurantId": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "events": {
+                    "type": "array",
+                    "maxItems": 200,
+                    "items": {
+                      "$ref": "#/components/schemas/Event"
+                    }
+                  }
+                },
+                "required": [
+                  "restaurantId",
+                  "events"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/reports": {
+      "get": {
+        "summary": "تقرير التشغيل أو تجربة منفصلة",
+        "x-capability": "reports.read",
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "restaurantId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "experimentId",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "businessDate",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "fromDate",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "toDate",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "beforeOccurredAt",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "beforeId",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Role/key scope denied"
+          },
+          "404": {
+            "description": "Resource not found or outside restaurant scope"
+          },
+          "409": {
+            "description": "Revision changed / closed day / already resolved"
+          }
+        }
+      }
+    },
+    "/api/reports.csv": {
+      "get": {
+        "summary": "إجمالي الأصناف CSV",
+        "x-capability": "reports.read",
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "restaurantId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "experimentId",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "businessDate",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "fromDate",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "toDate",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "beforeOccurredAt",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Role/key scope denied"
+          },
+          "404": {
+            "description": "Resource not found or outside restaurant scope"
+          },
+          "409": {
+            "description": "Revision changed / closed day / already resolved"
+          }
+        }
+      }
+    },
+    "/api/experiments": {
+      "get": {
+        "summary": "التجارب المحفوظة",
+        "x-capability": "experiments.run",
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "restaurantId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Role/key scope denied"
+          },
+          "404": {
+            "description": "Resource not found or outside restaurant scope"
+          },
+          "409": {
+            "description": "Revision changed / closed day / already resolved"
+          }
+        }
+      },
+      "post": {
+        "summary": "إنشاء تجربة فيديو محلي",
+        "x-capability": "experiments.run",
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Successful operation"
+          },
+          "201": {
+            "description": "Created where applicable"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Role/key scope denied"
+          },
+          "404": {
+            "description": "Resource not found or outside restaurant scope"
+          },
+          "409": {
+            "description": "Revision changed / closed day / already resolved"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "restaurantId": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "videoName": {
+                    "type": "string"
+                  },
+                  "durationSec": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 86400
+                  }
+                },
+                "required": [
+                  "restaurantId",
+                  "name",
+                  "videoName",
+                  "durationSec"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/experiments/{id}": {
+      "get": {
+        "summary": "حالة التجربة والملخص والبصمات",
+        "x-capability": "experiments.run",
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Role/key scope denied"
+          },
+          "404": {
+            "description": "Resource not found or outside restaurant scope"
+          },
+          "409": {
+            "description": "Revision changed / closed day / already resolved"
+          }
+        }
+      },
+      "post": {
+        "summary": "حفظ الحالة والملخص",
+        "x-capability": "experiments.run",
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation"
+          },
+          "201": {
+            "description": "Created where applicable"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Role/key scope denied"
+          },
+          "404": {
+            "description": "Resource not found or outside restaurant scope"
+          },
+          "409": {
+            "description": "Revision changed / closed day / already resolved"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "enum": [
+                      "running",
+                      "completed",
+                      "failed"
+                    ]
+                  },
+                  "summary": {
+                    "type": "object"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/unknown-events": {
+      "get": {
+        "summary": "عبورات تحتاج مراجعة",
+        "x-capability": "reports.read",
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "restaurantId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "experimentId",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Role/key scope denied"
+          },
+          "404": {
+            "description": "Resource not found or outside restaurant scope"
+          },
+          "409": {
+            "description": "Revision changed / closed day / already resolved"
+          }
+        }
+      },
+      "post": {
+        "summary": "تسجيل عبورات غير مؤكدة دون عد صنف",
+        "x-capability": "events.write",
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Successful operation"
+          },
+          "201": {
+            "description": "Created where applicable"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Role/key scope denied"
+          },
+          "404": {
+            "description": "Resource not found or outside restaurant scope"
+          },
+          "409": {
+            "description": "Revision changed / closed day / already resolved"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "restaurantId": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "events": {
+                    "type": "array",
+                    "maxItems": 100,
+                    "items": {
+                      "$ref": "#/components/schemas/UnknownEvent"
+                    }
+                  }
+                },
+                "required": [
+                  "restaurantId",
+                  "events"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/unknown-events/{id}/resolve": {
+      "post": {
+        "summary": "استبعاد أو تأكيد عبور مجهول",
+        "x-capability": "day.approve",
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation"
+          },
+          "201": {
+            "description": "Created where applicable"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Role/key scope denied"
+          },
+          "404": {
+            "description": "Resource not found or outside restaurant scope"
+          },
+          "409": {
+            "description": "Revision changed / closed day / already resolved"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "action": {
+                    "enum": [
+                      "exclude",
+                      "confirm"
+                    ]
+                  },
+                  "dishId": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "reason": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "action",
+                  "reason"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/pos": {
+      "get": {
+        "summary": "مراجعات الكاشير التاريخية",
+        "x-capability": "pos.read",
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "restaurantId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "businessDate",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Role/key scope denied"
+          },
+          "404": {
+            "description": "Resource not found or outside restaurant scope"
+          },
+          "409": {
+            "description": "Revision changed / closed day / already resolved"
+          }
+        }
+      },
+      "post": {
+        "summary": "استبدال كامل لبيانات يوم بمراجعة فريدة",
+        "x-capability": "pos.write",
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Successful operation"
+          },
+          "201": {
+            "description": "Created where applicable"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Role/key scope denied"
+          },
+          "404": {
+            "description": "Resource not found or outside restaurant scope"
+          },
+          "409": {
+            "description": "Revision changed / closed day / already resolved"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "restaurantId": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "businessDate": {
+                    "type": "string",
+                    "format": "date"
+                  },
+                  "revision": {
+                    "type": "string"
+                  },
+                  "items": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/PosItem"
+                    }
+                  }
+                },
+                "required": [
+                  "restaurantId",
+                  "businessDate",
+                  "revision",
+                  "items"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/reconciliation": {
+      "get": {
+        "summary": "مقارنة مرصود مقابل متوقع وتغطية اليوم",
+        "x-capability": "pos.read",
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "restaurantId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "businessDate",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Role/key scope denied"
+          },
+          "404": {
+            "description": "Resource not found or outside restaurant scope"
+          },
+          "409": {
+            "description": "Revision changed / closed day / already resolved"
+          }
+        }
+      }
+    },
+    "/api/day-reviews": {
+      "get": {
+        "summary": "حالة مراجعة اليوم",
+        "x-capability": "pos.read",
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "restaurantId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "businessDate",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Role/key scope denied"
+          },
+          "404": {
+            "description": "Resource not found or outside restaurant scope"
+          },
+          "409": {
+            "description": "Revision changed / closed day / already resolved"
+          }
+        }
+      },
+      "post": {
+        "summary": "اعتماد مدير أو إعادة فتح اليوم",
+        "x-capability": "day.approve",
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Successful operation"
+          },
+          "201": {
+            "description": "Created where applicable"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Role/key scope denied"
+          },
+          "404": {
+            "description": "Resource not found or outside restaurant scope"
+          },
+          "409": {
+            "description": "Revision changed / closed day / already resolved"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "restaurantId": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "businessDate": {
+                    "type": "string",
+                    "format": "date"
+                  },
+                  "action": {
+                    "enum": [
+                      "approve",
+                      "reopen"
+                    ]
+                  },
+                  "posRevision": {
+                    "type": "string"
+                  },
+                  "reason": {
+                    "type": "string"
+                  },
+                  "acknowledgeIncomplete": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "restaurantId",
+                  "businessDate",
+                  "action",
+                  "reason"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/monitor": {
+      "get": {
+        "summary": "المصادر والنبضات والفجوات",
+        "x-capability": "monitor.read",
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "restaurantId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Role/key scope denied"
+          },
+          "404": {
+            "description": "Resource not found or outside restaurant scope"
+          },
+          "409": {
+            "description": "Revision changed / closed day / already resolved"
+          }
+        }
+      }
+    },
+    "/api/monitor/start": {
+      "post": {
+        "summary": "بدء/استعادة مصدر ثابت الهوية",
+        "x-capability": "monitor.write",
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Successful operation"
+          },
+          "201": {
+            "description": "Created where applicable"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Role/key scope denied"
+          },
+          "404": {
+            "description": "Resource not found or outside restaurant scope"
+          },
+          "409": {
+            "description": "Revision changed / closed day / already resolved"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "restaurantId": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "sourceId": {
+                    "type": "string"
+                  },
+                  "camera": {
+                    "type": "string"
+                  },
+                  "sessionId": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "restaurantId",
+                  "sessionId",
+                  "camera",
+                  "sourceId"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/monitor/{id}/heartbeat": {
+      "post": {
+        "summary": "وصول إطارات ومعالجة حديثة أو توقف",
+        "x-capability": "monitor.write",
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation"
+          },
+          "201": {
+            "description": "Created where applicable"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Role/key scope denied"
+          },
+          "404": {
+            "description": "Resource not found or outside restaurant scope"
+          },
+          "409": {
+            "description": "Revision changed / closed day / already resolved"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "enum": [
+                      "running",
+                      "stalled"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/monitor/{id}/end": {
+      "post": {
+        "summary": "إنهاء متابعة",
+        "x-capability": "monitor.write",
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation"
+          },
+          "201": {
+            "description": "Created where applicable"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Role/key scope denied"
+          },
+          "404": {
+            "description": "Resource not found or outside restaurant scope"
+          },
+          "409": {
+            "description": "Revision changed / closed day / already resolved"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "reason": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/risks": {
+      "get": {
+        "summary": "سجل مخاطر بتقييمات ومتابعة",
+        "x-capability": "risks.read",
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "restaurantId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Role/key scope denied"
+          },
+          "404": {
+            "description": "Resource not found or outside restaurant scope"
+          },
+          "409": {
+            "description": "Revision changed / closed day / already resolved"
+          }
+        }
+      }
+    },
+    "/api/risks/{id}": {
+      "post": {
+        "summary": "تحديث التقييم والإجراء والمسؤول",
+        "x-capability": "risks.write",
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation"
+          },
+          "201": {
+            "description": "Created where applicable"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Role/key scope denied"
+          },
+          "404": {
+            "description": "Resource not found or outside restaurant scope"
+          },
+          "409": {
+            "description": "Revision changed / closed day / already resolved"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "probability": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 5
+                  },
+                  "impact": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 5
+                  },
+                  "status": {
+                    "enum": [
+                      "open",
+                      "mitigating",
+                      "accepted",
+                      "closed"
+                    ]
+                  },
+                  "mitigation": {
+                    "type": "string"
+                  },
+                  "assignee": {
+                    "type": "string"
+                  },
+                  "notes": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/users": {
+      "get": {
+        "summary": "الحسابات المخولة ضمن نطاق المدير",
+        "x-capability": "users.manage",
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Successful operation"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Role/key scope denied"
+          },
+          "404": {
+            "description": "Resource not found or outside restaurant scope"
+          },
+          "409": {
+            "description": "Revision changed / closed day / already resolved"
+          }
+        }
+      },
+      "post": {
+        "summary": "إنشاء حساب بأدوار ومطاعم محدودة",
+        "x-capability": "users.manage",
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Successful operation"
+          },
+          "201": {
+            "description": "Created where applicable"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Role/key scope denied"
+          },
+          "404": {
+            "description": "Resource not found or outside restaurant scope"
+          },
+          "409": {
+            "description": "Revision changed / closed day / already resolved"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "password": {
+                    "type": "string",
+                    "writeOnly": true
+                  },
+                  "role": {
+                    "enum": [
+                      "manager",
+                      "daily_operator",
+                      "engineer",
+                      "viewer"
+                    ]
+                  },
+                  "restaurantIds": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer",
+                      "minimum": 1
+                    }
+                  }
+                },
+                "required": [
+                  "email",
+                  "name",
+                  "password",
+                  "role",
+                  "restaurantIds"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/users/{id}": {
+      "post": {
+        "summary": "تعديل الدور/تعطيل حساب وإبطال جلساته",
+        "x-capability": "users.manage",
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation"
+          },
+          "201": {
+            "description": "Created where applicable"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Role/key scope denied"
+          },
+          "404": {
+            "description": "Resource not found or outside restaurant scope"
+          },
+          "409": {
+            "description": "Revision changed / closed day / already resolved"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "role": {
+                    "enum": [
+                      "manager",
+                      "daily_operator",
+                      "engineer",
+                      "viewer"
+                    ]
+                  },
+                  "disabled": {
+                    "type": "boolean"
+                  },
+                  "restaurantIds": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer",
+                      "minimum": 1
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/integration-keys": {
+      "get": {
+        "summary": "مفاتيح الربط دون القيم السرية",
+        "x-capability": "integrations.manage",
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Successful operation"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Role/key scope denied"
+          },
+          "404": {
+            "description": "Resource not found or outside restaurant scope"
+          },
+          "409": {
+            "description": "Revision changed / closed day / already resolved"
+          }
+        }
+      },
+      "post": {
+        "summary": "إنشاء مفتاح محدود يظهر مرة واحدة",
+        "x-capability": "integrations.manage",
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Successful operation"
+          },
+          "201": {
+            "description": "Created where applicable"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Role/key scope denied"
+          },
+          "404": {
+            "description": "Resource not found or outside restaurant scope"
+          },
+          "409": {
+            "description": "Revision changed / closed day / already resolved"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "label": {
+                    "type": "string"
+                  },
+                  "restaurantIds": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer",
+                      "minimum": 1
+                    }
+                  },
+                  "scopes": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "validDays": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 365
+                  }
+                },
+                "required": [
+                  "label",
+                  "restaurantIds",
+                  "scopes"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/integration-keys/{id}/revoke": {
+      "post": {
+        "summary": "إلغاء مفتاح ربط",
+        "x-capability": "integrations.manage",
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation"
+          },
+          "201": {
+            "description": "Created where applicable"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Role/key scope denied"
+          },
+          "404": {
+            "description": "Resource not found or outside restaurant scope"
+          },
+          "409": {
+            "description": "Revision changed / closed day / already resolved"
+          }
+        }
+      }
+    },
+    "/api/audit": {
+      "get": {
+        "summary": "سجل تغييرات حسب النطاق",
+        "x-capability": "audit.read",
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Role/key scope denied"
+          },
+          "404": {
+            "description": "Resource not found or outside restaurant scope"
+          },
+          "409": {
+            "description": "Revision changed / closed day / already resolved"
+          }
+        }
+      }
+    },
+    "/api/model-info": {
+      "get": {
+        "summary": "بصمات النماذج المخزنة",
+        "x-capability": "catalog.read",
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Successful operation"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Role/key scope denied"
+          },
+          "404": {
+            "description": "Resource not found or outside restaurant scope"
+          },
+          "409": {
+            "description": "Revision changed / closed day / already resolved"
+          }
+        }
+      }
+    },
+    "/api/capacity": {
+      "get": {
+        "summary": "افتراضات السعة والقياسات المرجعية",
+        "x-capability": "reports.read",
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Successful operation"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Role/key scope denied"
+          },
+          "404": {
+            "description": "Resource not found or outside restaurant scope"
+          },
+          "409": {
+            "description": "Revision changed / closed day / already resolved"
+          }
+        }
+      }
+    },
+    "/api/openapi": {
+      "get": {
+        "summary": "مرجع OpenAPI قابل للتنزيل",
+        "x-capability": "authenticated",
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Successful operation"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Role/key scope denied"
+          },
+          "404": {
+            "description": "Resource not found or outside restaurant scope"
+          },
+          "409": {
+            "description": "Revision changed / closed day / already resolved"
+          }
+        }
+      }
+    }
+  }
+}

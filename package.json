@@ -1,6 +1,6 @@
 {
   "name": "iep-dish-counter",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "engines": {
@@ -8,11 +8,17 @@
   },
   "scripts": {
     "start": "node server/index.mjs",
-    "test": "node --test tests/*.test.js server/*.test.mjs"
+    "test": "node --test tests/*.test.js server/*.test.mjs",
+    "test:browser": "node scripts/browser-workflow-check.mjs && node tests/frontend-regression.mjs && node tests/frontend-frozen-regression.mjs && node scripts/browser-admin-check.mjs",
+    "test:models": "node scripts/model-smoke.mjs",
+    "bench:capacity": "node scripts/benchmark-capacity.mjs"
   },
   "dependencies": {
-    "@tensorflow/tfjs": "4.22.0",
+    "@tensorflow-models/coco-ssd": "2.2.3",
     "@tensorflow-models/mobilenet": "2.1.1",
-    "@tensorflow-models/coco-ssd": "2.2.3"
+    "@tensorflow/tfjs": "4.22.0"
+  },
+  "devDependencies": {
+    "playwright": "1.62.1"
   }
 }

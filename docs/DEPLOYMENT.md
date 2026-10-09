@@ -1,22 +1,48 @@
-# Deployment proposal for IEP
+# نشر IEP للتجربة واختيار مسار التشغيل النهائي
 
-This is a pilot, not a validated production counting system. No subscription or public deployment has been created.
+النسخة نموذج تجريبي وظيفي؛ لا يوجد رابط عام أو اشتراك استضافة مدفوع تم إنشاؤه، ولا قبول دقة مطعم أو Android فعلي أو تشغيل ٢٤ ساعة. إعداد بيئة Codex وتشغيلها ليس نشر تطبيق عام للموبايل.
 
-## Initial Android pilot
-Run the Node 24 service behind an HTTPS reverse proxy on a small VPS/container host with a persistent volume for `IEP_DATA_DIR`. Camera access requires HTTPS (localhost exception does not apply to a phone visiting another machine). Set `IEP_ADMIN_EMAIL` and securely inject `IEP_ADMIN_PASSWORD` for initial provisioning. Set `IEP_SECURE_COOKIE=true` in HTTPS deployments and `HOST=0.0.0.0` inside a container. Keep the Node port private; expose only HTTPS via the proxy. Persist and back up the entire data directory; SQLite must use a local disk, not a shared multi-instance filesystem. Use one service replica. Test backup restoration before customer use. Run `python3 scripts/download-models.py` before building the Docker image. The Dockerfile includes verified local model assets. Container build validation remains incomplete; prior dependency-fetch attempts stalled in the container network.
+## خادم تجربة Android
 
-For pilot use SQLite reduces costs; for commercial deployment migrate to managed PostgreSQL and private S3-compatible image storage, introduce tenant roles/invitations, audit logs, retention policies and upload quotas. These are planned work, not current capabilities. Do not put credentials in Git or send them in chat.
+ابدأ بخدمة واحدة Node.js ‏24 خلف HTTPS reverse proxy، وstorage دائم لـ`IEP_DATA_DIR`. اقتراح بداية لخادم ويب موقع واحد: ٢vCPU و٤GB RAM و٤٠–٨٠GB SSD حسب الصور والنسخ؛ ليست مواصفات معتمدة بضغط متزامن. التحليل الحالي على جهاز المتصفح، لذلك رفع قدرة خادم الويب لا يسرّع inference على موبايل العميل. [تقرير السعة](CAPACITY_AND_OPERATIONS.md) يفصل الجهاز داخل المطعم عن خادم الويب.
 
-Hosting suggestion: a small VPS or container service with persistent storage, HTTPS, and automated backups for the pilot; managed PostgreSQL and object storage when multiple customers start. Exact costs depend on country, image retention, camera count and selected provider; obtain a live quote before purchasing. Camera inference runs locally in the browser and consumes device battery, rather than paying a cloud API per frame. No public hosting tool is available in this task.
+1. نزّل المتطلبات والنماذج وفق README؛ Python3 أداة تحضير خارج حاوية التشغيل. احفظ كلمة الإدارة في إعدادات الاستضافة أو secret manager، وليس Git أو Dockerfile أو command history.
+2. اضبط `IEP_ADMIN_EMAIL` و`IEP_ADMIN_PASSWORD` للإقلاع الأول، و`IEP_DATA_DIR` إلى volume دائم. التطبيق يطلب كلمة مرور ١٢ حرفًا فأكثر ولا يغيّر كلمة حساب موجود بمجرد تغيير متغير bootstrap.
+3. HTTPS يجب أن يصل من الهاتف؛ `localhost` ليس عنوان الكمبيوتر من الموبايل. `IEP_SECURE_COOKIE=true`، و`HOST=0.0.0.0` داخل الحاوية، واجعل Node port خاصًا خلف proxy. احتفظ بهيئة Host الأصلية لدعم same-origin checks، ولا تعرض منافذ NVR للإنترنت.
+4. SQLite على قرص محلي لـreplica واحدة، لا ملف قاعدة مشترك بين عدة instances. خزّن واستعد دليل البيانات واختبر الدخول واللقطات وحفظ حدث قبل إدخال عملاء.
+5. من «المستخدمون» أنشئ الحسابات بالأدوار والمطاعم اللازمة؛ حسابات المالك المنفصلة تفصل العملاء. المفاتيح محددة بنطاقات ومطاعم ووقت، وتُعرض مرة واحدة. ضَع rotation/revocation وأمن الجهاز في إجراءات التشغيل.
 
-## Recognition and mobile counting
-Reference matching uses MobileNet embeddings; generic COCO-SSD provides only its supported object categories (including bowls, not a universal plate detector). This cannot identify every restaurant dish out of the box. Add several real examples per dish and validate on held-out footage under actual lighting. Close-looking dishes need a dedicated trained detector/classifier. Do not equate similarity score with measured accuracy.
+## Docker
 
-Moving-phone mode is recognition plus explicit user confirmation. Fixed-camera mode uses tracked line crossings. The software cannot guarantee physical dish identity after occlusion, disappearance or camera movement. Measure false positives, missed dishes, double counts and identity switches against independently annotated footage before accepting automatic counts. The full automatically deduplicated moving-camera requirement remains research/validation work.
+شغّل تنزيل النماذج قبل البناء لأن Dockerfile ينسخ `.local/models`. صورة التشغيل تثبت dependencies بـ`npm ci --omit=dev --ignore-scripts`، ولا تشمل Playwright/Chromium أو أدوات التدريب والاختبارات. أضف volume دائمًا لمسار `/data`، وHTTPS proxy، ومتغيرات الأسرار عبر settings. صورة Node مصدر موثوق؛ تحقق TLS وأدلة النماذج يبقيان مفعّلين.
 
-Model downloads use TensorFlow-hosted endpoints: storage.googleapis.com and tfhub.dev; redirects may require www.kaggle.com or kaggle.com. Model download access now works. The setup script verifies upstream artifact integrity and saves models locally. Chromium successfully loaded both real models and ran synthetic-frame inference; restaurant recognition accuracy remains untested. Local JS packages are installed. Browser model downloads do not upload camera video. Reference image upload is intentional and stored server-side.
+```sh
+python3 scripts/download-models.py
+docker build -t iep-pilot .
+```
 
-## Hikvision NVR follow-up
-Check the exact NVR and camera model/manual for RTSP stream export and supported ONVIF profile. Browser JavaScript cannot directly read RTSP. An authenticated edge connector on the restaurant LAN should pull RTSP, run detection/tracking there, and send count events and selected snapshots over HTTPS. Alternatively a gateway can convert video to WebRTC/HLS, with HLS latency considered. Do not expose NVR ports on the public Internet.
+لا تستخدم `docker run --rm` بلا volume لحفظ مطعم؛ خروج الحاوية لا ينبغي أن يمحو قاعدة البيانات. اضبط restart policy على host وأعد اختبار boot/restart، لكن هذا يعيد خادم الويب فقط؛ لا يبدأ تصوير الهاتف تلقائيًا. لم يُعتمد build/runtime Docker بالكامل في هذه البيئة، فلا نصف ملف Docker بأنه اختبار نشر مكتمل.
 
-Typical Hikvision RTSP channel paths are `/Streaming/Channels/101` (channel 1 main) and `/Streaming/Channels/102` (substream), but verify against the actual model and firmware. Credentials must be stored on the edge securely; they are not yet needed for the mobile pilot. Supported camera selection should require documented RTSP/ONVIF, stable frame rate and resolution, fixed mounting, useful field of view, suitable lighting and a LAN edge device. Camera model compatibility and NVR integration have not yet been tested; no live web research tool was available.
+## الحماية والعمليات الموجودة وحدودها
+
+توجد الآن أدوار owner/manager/daily_operator/engineer/viewer، إدارة مستخدمين، تحقق صلاحيات server-side بحسب المطعم، مفاتيح تكامل Bearer محدودة قابلة للإلغاء، سجل تدقيق، سجل مخاطر، تصحيحات أحداث ومراجعة مجهول واعتماد مدير لليوم. هذه وظائف prototype وليست شهادة أمن أو تدقيقًا مقاومًا لتلاعب مدير قاعدة البيانات. اقرأ [الصلاحيات](RISK_AND_ACCESS.md) و[التكامل](INTEGRATION_GUIDE.md).
+
+ما زال مطلوبًا للإنتاج: مراجعة أمن ميدانية، سياسة احتفاظ وحذف وحصص على الخادم، نسخ خارج الجهاز واستعادة، تنبيهات خارجية ومراقبة disk/CPU/temperature، إدارة تحديثات، وفوترة/اشتراكات عند الحاجة. عند زيادة العملاء انقل قاعدة البيانات إلى PostgreSQL وتخزين الصور إلى مخزن خاص مع صلاحيات وصول؛ هذا تصميم لاحق وليس تكاملًا موجودًا. أسعار الاستضافة تعتمد على المزود والاحتفاظ والبلد؛ احصل على عرض حي قبل الشراء.
+
+## النماذج والدقة والسعة
+
+التنزيل الحالي من `storage.googleapis.com` باستخدام TLS وMD5 المصدر ثم حفظ SHA256 محليًا. أسماء URLs ثابتة لكن المحتوى ليس pin إصدارًا غير قابل للتغيير؛ تُحفظ بصمات manifest وإعدادات التجربة للتتبع. لا تستخدم تعطيل التحقق أو تجاوز الشهادات لحل فشل الشبكة. تشغيل المتصفح يحمّل JS وأوزان النماذج من خادم التطبيق؛ لا تُرسل إطارات الفيديو لخدمة تحليل خارجية. رفع الصور المرجعية واللقطات إجراء مقصود ومخزن محليًا.
+
+MobileNet يقارن المظهر وCOCO-SSD يكشف فئاته العامة؛ ليس كاشفًا لكل الأطباق المسطحة، ولا يحدد محتوى أكواب مغلقة متطابقة. التشابه ليس نسبة دقة مقاسة. اختبر فيديو مطعم مستقل و١/٢/٤ عناصر وصواني وأيدٍ وعودة وسرعة وإضاءة؛ moving-phone يحتاج تأكيدًا يدويًا، والعد التلقائي تجريبي للثابت.
+
+CPU الحالي سجل متوسط٤٫٦٤s لكشف+٤ قصاصات، وWebGL البرمجي١٫٥٣s على640×360، بلا GPU فعلي. هذا لا يكفي5fps، ولم يشغّل يومًا كاملًا. تحتاج النسخة النهائية نموذجًا مخصصًا وتنفيذًا أسرع وbenchmark على الجهاز المرشح؛ لا تعتمد شراء جهاز لمجرد اقتراح RAM/CPU. [القياسات والاستقراء والتخزين](CAPACITY_AND_OPERATIONS.md) توضح حدود الدليل.
+
+## كاميرات Hikvision/NVR وخدمة داخل المطعم
+
+اختر كاميرات IP ثابتة توفر RTSP موثقًا ودعم ONVIF مناسبًا، PoE عند الإمكان، H.264 للاختبار، عدسة وإضاءة تظهر أربعة عناصر عند شباك متر. ابدأ بكاميرا لكل نقطة خروج؛ إن كان الحجب يمنع ظهور العناصر اختبر زاوية ثانية قبل الشراء النهائي. تحقق من manual والموديل والfirmware ومعدل البث الفعلي؛ لم نعتمد موديلًا معينًا أو بحث أسعار/توافق حيًا.
+
+JavaScript في المتصفح لا يقرأ RTSP مباشرة. موصل آمن داخل LAN يقرأ الكاميرات/NVR، يشغّل التعرف والتتبع محليًا، ويحفظ الأحداث ثم يرفعها عبر HTTPS. تحويل RTSP إلى WebRTC/HLS ممكن كواجهة مشاهدة، لكنه لا يوفر وحده معالجة مستقلة أو عدًا موثوقًا، وHLS يضيف latency. المسارات الشائعة Hikvision مثل `/Streaming/Channels/101` و`102` أمثلة تحتاج تحققًا من الجهاز.
+
+اقتراح جهاز edge للبدء بالاختبار: CPU حديث٤–٨ أنوية و١٦GB RAM وSSD512GB وLAN سلكي، GPU اختياري بناءً على النموذج والقياس؛ لا وعد realtime بهذه المواصفات. GPU/CUDA وخدمة RTSP/backfill ليست وظائف مكتملة. recording NVR منفصل عن صور أحداث SQLite: كاميرتان2Mbps طوال اليوم≈43.2GB/يوم أو1.296TB/30يوم قبل الهامش.
+
+UPS يشمل PoE والكاميرات وNVR وedge والشبكة؛ اختبر runtime بالحمل وإعادة الإقلاع. الفجوات تُعرض بوضوح؛ ما لم يسجله NVR أثناء غياب التصوير لا يمكن استنتاج خروجه. استرجاع تسجيل موجود يحتاج موصلًا ومفاتيح زمنية وسياسة overlap لمنع التكرار، ولا يوجد تلقائيًا الآن. [دليل التشغيل](OPERATIONS.md) يشرح الطابور والفجوات والنسخ واستثناءات الكاشير.

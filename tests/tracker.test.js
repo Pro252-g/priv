@@ -48,3 +48,52 @@ test('moving camera suppresses counting and clears crossing baseline', () => {
   assert.equal(tracker.update([dish(.55)], 200, false).events.length, 0);
   assert.equal(tracker.update([dish(.65)], 300, true).events.length, 0);
 });
+
+test('early crossing buffers until third stable observation with original timestamp', () => {
+  const tracker = new DishTracker();
+  const events = [.4, .55, .65, .7].flatMap((y, i) => tracker.update([dish(y)], i * 100).events);
+  assert.equal(events.length, 1);
+  assert.equal(events[0].timestamp, 100);
+});
+test('buffered crossing cannot be attributed to a changed label', () => {
+  const tracker = new DishTracker();
+  tracker.update([dish(.4)], 0);
+  tracker.update([dish(.55)], 100);
+  const changed = tracker.update([dish(.65, .2, 'soup')], 200);
+  assert.equal(changed.events.length, 0);
+  assert.equal(changed.unknownEvents.length, 1);
+  assert.equal(changed.unknownEvents[0].counted, false);
+  [.7, .75, .8].forEach((y, i) => assert.equal(tracker.update([dish(y, .2, 'soup')], 300 + i * 100).events.length, 0));
+});
+test('unknown crossing expires into review separately from counted dishes', () => {
+  const tracker = new DishTracker({ candidateTtlMs: 200 });
+  tracker.update([dish(.4, .2, null)], 0);
+  tracker.update([dish(.55, .2, null)], 100);
+  const result = tracker.update([dish(.65, .2, null)], 300);
+  assert.equal(result.events.length, 0);
+  assert.equal(result.unknownEvents.length, 1);
+  assert.equal(result.unknownEvents[0].timestamp, 100);
+  assert.equal(result.unknownEvents[0].dishId, null);
+});
+test('loss of visibility cannot confirm a buffered crossing on reappearance', () => {
+  const tracker = new DishTracker();
+  tracker.update([dish(.4)], 0);
+  tracker.update([dish(.55)], 100);
+  assert.equal(tracker.update([], 200).unknownEvents.length, 1);
+  assert.equal(tracker.update([dish(.65)], 300).events.length, 0);
+});
+test('invalid or decreasing timestamps normalize without expiring candidates', () => {
+  const tracker = new DishTracker();
+  tracker.update([dish(.4)], 100);
+  tracker.update([dish(.55)], NaN);
+  const result = tracker.update([dish(.65)], 50);
+  assert.equal(result.events.length, 1);
+  assert.equal(result.events[0].timestamp, 100);
+});
+test('label switching on crossing frame remains review even after new label stabilizes', () => {
+  const tracker = new DishTracker();
+  tracker.update([dish(.4)], 0);
+  const crossing = tracker.update([dish(.55, .2, 'soup')], 100);
+  assert.equal(crossing.unknownEvents.length, 1);
+  [.65, .7, .75].forEach((y, i) => assert.equal(tracker.update([dish(y, .2, 'soup')], 200 + i * 100).events.length, 0));
+});

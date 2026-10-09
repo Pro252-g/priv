@@ -1,23 +1,69 @@
-# IEP Dish Counter — pilot
+# IEP Vision — نسخة تجريبية لتتبع خروج الأطباق والمشروبات
 
-Arabic RTL Android camera interface and desktop reports, built with Node 24, SQLite and browser TensorFlow.js. Supports multiple restaurant catalogs and owner-isolated data; separate customer accounts are provisioned by an operator, not public registration.
+واجهة عربية للموبايل والكمبيوتر، Node.js ‏24 وSQLite وTensorFlow.js. الهدف النهائي نقطتا خروج ثابتتان للأطباق والمشروبات مع كشف وتتبع وعد تلقائي ومقارنة بالكاشير. النسخة الحالية تتيح تجربة فيديو محلي، عد عبور تجريبي، تقارير، صلاحيات مستخدمين، مراجعة المخاطر والأحداث، ومفاتيح API. **دقة المطعم والتشغيل المتواصل ٢٤ ساعة وربط Hikvision لم تُعتمد بعد.**
 
-## Run
+## التشغيل على جهازك
+
+تحتاج Node.js ‏24 أو أحدث وPython ‏3 لتنزيل النماذج. افتح Terminal داخل مجلد المشروع:
 
 ```sh
-npm ci --cache /workspace/priv/.local/npm-cache --ignore-scripts --no-audit --no-fund
+npm ci --ignore-scripts --no-audit --no-fund
 python3 scripts/download-models.py
 npm test
 ```
 
-Securely supply `IEP_ADMIN_PASSWORD` (12+ characters) and optionally `IEP_ADMIN_EMAIL`, then run `npm start`. No default password is provided. `IEP_DATA_DIR` defaults to `.local/data`. Passwords are hashed; bootstrap does not reset an existing password. Keep this directory and backups private. For mobile access deploy behind HTTPS and set `IEP_SECURE_COOKIE=true`; a phone cannot access this machine through its own localhost.
+على Windows يمكن استبدال أمر Python بـ`py -3 scripts/download-models.py` إذا كان Python Launcher مثبتًا. التنزيل يحافظ على TLS والتحقق من سلامة ملفات المصدر، ويحفظ النماذج وبصماتها في `.local/models`؛ لا تحتاج خدمة تحليل مدفوعة.
 
-## Pilot workflow
+ضع كلمة مرور الإدارة في إعدادات البيئة أو أدخلها محليًا دون كتابتها في سجل الأوامر. في Bash على Linux/macOS:
 
-Log in, create a restaurant, add dish names and several JPEG/PNG reference examples, then open the camera and grant permission. Mobile-moving mode uses explicit user confirmation for saved counts. Fixed-camera line crossing can count supported detections automatically once per track. Reports show saved records and export totals to CSV. Local model files must be prepared with the download script; browser inference then loads them from the same application server. There are no paid cloud inference calls.
+```sh
+export IEP_ADMIN_EMAIL=admin@iep.local
+read -r -s -p 'Admin password (12+ characters): ' IEP_ADMIN_PASSWORD
+printf '\n'
+export IEP_ADMIN_PASSWORD
+npm start
+```
 
-Use «تجارب الفيديو» to select a recorded video and run sequential analysis. Each experiment is separate from live reports and stores relative video timestamps. Use «مطابقة المبيعات» to enter gross quantities before cancellation or import a mapped CSV, review it, and save the full daily revision. Differences are review signals, not proof of theft. Browser event outbox persists pending submissions across reload; monitoring records interrupted coverage. See [operations guide](docs/OPERATIONS.md).
+في Windows PowerShell:
 
-Automatic mobile physical-object deduplication is **not solved or validated**. Generic detection does not cover arbitrary restaurant plates; recognition matching is experimental. Occlusion, overlap and returning dishes can change track identity. Counts need comparison with independently annotated real footage before operational use. Reference photos are stored; continuous video is not recorded. See [deployment proposal](docs/DEPLOYMENT.md), [API](server/API.md), and tracker tests for the implemented boundaries.
+```powershell
+$env:IEP_ADMIN_EMAIL='admin@iep.local'
+$env:IEP_ADMIN_PASSWORD=[System.Net.NetworkCredential]::new('', (Read-Host 'Admin password (12+ characters)' -AsSecureString)).Password
+npm start
+```
 
-No public deployment, restaurant dataset, Android device validation, or Hikvision integration is included yet. Tenant roles, subscriptions, configurable retention, managed PostgreSQL and image object storage are production follow-up work.
+افتح `http://localhost:3000` على الكمبيوتر نفسه وسجل بالبريد وكلمة المرور اللذين اخترتهما. لا توجد كلمة مرور افتراضية. تغيير متغير bootstrap لا يعيد تعيين كلمة مرور حساب موجود. `IEP_DATA_DIR` افتراضيًا `.local/data` ويحتوي قاعدة البيانات والصور؛ لا تشاركه أو تضعه في Git.
+
+**لتجربة كاميرا Android تحتاج رابط HTTPS يمكن للهاتف الوصول إليه.** localhost على الهاتف يشير إلى الهاتف نفسه. انشر الخادم خلف HTTPS مع `IEP_SECURE_COOKIE=true` ثم افتح الرابط في Chrome وامنح إذن الكاميرا؛ لا يحتاج ميكروفونًا. لا يوجد رابط استضافة عامة جاهز حاليًا. [دليل النشر](docs/DEPLOYMENT.md) يوضح إعداد الخادم، ويختلف عن نشر إعدادات بيئة Codex.
+
+## التجربة الأولى
+
+1. أضف مطعمًا من زر `+`، ثم صنفًا لكل طبق أو مشروب وصور JPEG/PNG حقيقية متنوعة من «مكتبة الأطباق». الصور أمثلة مرجعية وليست تدريبًا تلقائيًا لنموذج مطعم.
+2. من «إعدادات العد» حدد خط العبور واتجاه الخروج وحفظ اللقطات. ثبّت الكاميرا؛ الموبايل المتحرك يعمل بتأكيد يدوي، والعبور التلقائي تجريبي للكاميرا الثابتة.
+3. من «تجارب الفيديو» اختر MP4 مدعومًا، وابدأ بمقطع قصير. يمكنك تحديد بداية ونهاية الجزء وإيقاف المعالجة مؤقتًا. النتائج بتوقيت الفيديو ومنفصلة عن أعداد التشغيل ومطابقة المبيعات. لا يُرفع الفيديو كاملًا؛ احتفظ بالأصل. بصمة الملف وإعدادات النموذج ومراجع التجربة تُحفظ للمقارنة.
+4. راجع العدد واللقطات مقابل عد بشري. العبورات المجهولة تُحفظ للمراجعة عندما يكتشف المتتبع عبورها؛ العناصر التي لم يكتشفها النموذج إطلاقًا قد تفوت النظام.
+5. في «مطابقة المبيعات» اختر اليوم وأدخل أعداد الكاشير أو CSV كاملًا لكل الأصناف، راجعها ثم احفظ. المتوقع = الإجمالي قبل الإلغاء − الملغي قبل الخروج + المجاني الخارج + الهالك الذي خرج عبر الشباك. الفارق إشارة مراجعة وليس دليل سرقة.
+6. من «إدارة المخاطر» يتابع المدير المخاطر، يراجع المجهول والتصحيحات، ويعتمد مراجعة اليوم مع الإقرار بحدود التغطية. الحدث الأصلي لا يُحذف عند التصحيح؛ التقارير تتبع آخر تصحيح.
+
+## المستخدمون والربط
+
+المالك يدير مساحة العميل؛ مدير، مسؤول إدخال يومي، مهندس، ومشاهد لهم صلاحيات ومطاعم محددة، مع تحقق على الخادم. واجهة «المستخدمون» تتيح إنشاء الحسابات وتعديل أدوارها ومطاعمها وتعطيلها ضمن صلاحية الإدارة. العملاء المنفصلون يُجهَّزون كحسابات مالك منفصلة؛ لا توجد عضوية عامة أو نظام اشتراكات وفوترة.
+
+«الربط وAPI» يعرض المسارات والصلاحيات، ويصدر OpenAPI، ويتيح مفاتيح Bearer محددة بالمطاعم والنطاقات والمدة مع إلغائها. المفتاح يظهر مرة واحدة؛ خزنه بأمان ولا ترسله في الشات. API لا يعني أن الكاشير أو RTSP موصل بالفعل. انظر [الصلاحيات والمراجعة](docs/RISK_AND_ACCESS.md)، [دليل التكامل](docs/INTEGRATION_GUIDE.md)، و[عقد API](server/API.md).
+
+## الاختبارات والحدود
+
+```sh
+npm test
+npm run test:browser
+npm run test:models
+npm run bench:capacity
+```
+
+اختبار الفيديو يحتاج FFmpeg لتوليد MP4 اصطناعي عند غياب الملف المحلي. اختبارات المتصفح تحتاج Chromium؛ حدد `IEP_BROWSER_EXECUTABLE` لنسخة مثبتة، أو نفذ `npx playwright install chromium` لتجهيز نسخة Playwright الموثوقة. Playwright تابع تطوير يُثبت بواسطة `npm ci`. اختبار الفيديو الاصطناعي يتحقق من التسجيل والربط والتتبع وليس دقة التعرف على أطباق المطعم. اختبار النماذج يستخدم الأوزان الحقيقية وبصماتها وإطارات اصطناعية؛ لا يقيس دقة أصناف حقيقية. قياس السعة قابل للإعادة عبر أمر benchmark.
+
+المسار الحالي بطيء في البيئة السحابية: كشف + أربع قصاصات بلغ متوسط ٤٫٦٤ ثانية CPU و١٫٥٣ ثانية WebGL **برمجي**؛ لا يحقق ٥fps. لا يُنصح ببدء فيديو يوم كامل للتجربة الأولى. اختيار جهاز المطعم يحتاج نموذجًا ومسار تنفيذ أسرع وقياسًا فعليًا. [تقرير السعة والتشغيل](docs/CAPACITY_AND_OPERATIONS.md) يفصل القياسات وحسابات التخزين، و[تقرير المشروع](docs/PROJECT_REVIEW.md) يوضح نتائج المراجعة والإصلاحات.
+
+طابور الأحداث يُحفظ محليًا ويُعاد إرساله تلقائيًا مع منع التكرار، بحد ١٠٠٠ حدث أو حجم تقديري ٦٤MiB، ثم تتوقف المعالجة عند الامتلاء. المراقبة تتبع وصول إطارات جديدة وغيابها؛ تغطية ناقصة لا تعني صفر خروج. إغلاق المتصفح أو فقد تخزينه قد يفقد بيانات، والكهرباء المنقطعة لا تسمح باستنتاج ما خرج دون تسجيل. [دليل التشغيل](docs/OPERATIONS.md) يشرح التعافي والاستثناءات.
+
+لا يوجد تدريب مخصص للمطعم أو تحقق Android فعلي أو RTSP/NVR connector أو backfill تلقائي أو GPU/CUDA أو اختبار وردية/٢٤ ساعة مكتمل. PostgreSQL وتخزين الصور المنفصل والاحتفاظ الآلي والحصص الشاملة والتنبيهات الخارجية متابعة للإنتاج. التتبع لا يضمن الهوية بعد حجب طويل أو خروج وعودة، ولا يمكن تحديد محتوى أكواب متطابقة ومغلقة بالصورة وحدها.
