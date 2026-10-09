@@ -1,0 +1,40 @@
+import {createHash,randomBytes} from 'node:crypto';
+import {mkdirSync,readFileSync,writeFileSync,lstatSync,existsSync,linkSync,unlinkSync,openSync,fsyncSync,closeSync,renameSync} from 'node:fs';
+import path from 'node:path';
+const digest=data=>createHash('sha256').update(data).digest('hex');
+const failure=(status,message)=>Object.assign(new Error(message),{status});
+export function parseImage(value,maxBytes){
+ if(!value)return null;const m=/^data:(image\/(?:jpeg|png));base64,([A-Za-z0-9+/]+={0,2})$/.exec(value);if(!m)throw failure(400,'Use a JPEG or PNG image');
+ const data=Buffer.from(m[2],'base64');if(data.length>maxBytes)throw failure(413,'Image exceeds allowed size');
+ const valid=m[1]==='image/png'?data.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10])):data[0]===255&&data[1]===216&&data[2]===255;if(!valid)throw failure(400,'Invalid image signature');return{mime:m[1],data};
+}
+export function initializeMedia(db){
+ db.exec('CREATE TABLE IF NOT EXISTS media_objects(image_key TEXT PRIMARY KEY,owner_id INTEGER,mime TEXT,sha256 TEXT,byte_size INTEGER,status TEXT,error_code TEXT,created_at TEXT DEFAULT CURRENT_TIMESTAMP); CREATE INDEX IF NOT EXISTS media_owner_idx ON media_objects(owner_id,image_key);');
+ for(const table of ['samples','events','unknown_crossings'])for(const col of ['image_key TEXT','media_status TEXT'])if(!db.prepare(`PRAGMA table_info(${table})`).all().some(c=>c.name===col.split(' ')[0]))db.exec(`ALTER TABLE ${table} ADD COLUMN ${col}`);
+ // Recreate so e.* exposes newly added media columns on older SQLite schemas.
+ db.exec(`DROP VIEW IF EXISTS effective_events; CREATE VIEW effective_events AS SELECT e.*,COALESCE(c.new_dish_id,e.dish_id) effective_dish_id,CASE WHEN c.action='void' THEN 1 ELSE 0 END effective_void,c.id correction_id FROM events e LEFT JOIN event_corrections c ON c.id=(SELECT MAX(c2.id) FROM event_corrections c2 WHERE c2.event_id=e.id);`);
+}
+export function createMediaStore({db,mediaDir,dataDir}){
+ const directory=path.resolve(mediaDir);try{mkdirSync(directory,{recursive:true,mode:0o700});}catch{}let batchCreated=null;
+ const filename=key=>{if(!/^t[1-9]\d*\/[a-f0-9]{64}$/.test(key))throw failure(404,'Image not found');return path.join(directory,key);};
+ const mark=(key,status,error=null)=>{db.prepare('UPDATE media_objects SET status=?,error_code=? WHERE image_key=?').run(status,error,key);for(const table of ['samples','events','unknown_crossings'])db.prepare(`UPDATE ${table} SET media_status=? WHERE image_key=? AND ${table==='samples'?'data':'snapshot'} IS NULL`).run(status,key);return status;};
+ const metadata=(key,owner)=>{if(!key)return null;const row=db.prepare('SELECT image_key,owner_id,mime,sha256,byte_size,status FROM media_objects WHERE image_key=? AND owner_id=?').get(key,owner);if(!row)throw failure(404,'Image not found');return row;};
+ const keyFor=(owner,image)=>`t${owner}/${digest(image.data)}`;
+ function put(owner,image,expectedKey=null){if(image)parseImage(`data:${image.mime};base64,${image.data.toString('base64')}`,2*1024*1024);if(!image)return{key:null,status:'none'};const key=keyFor(owner,image);if(expectedKey&&expectedKey!==key)throw failure(409,'Retry image differs from the original image');const sha=digest(image.data);const old=db.prepare('SELECT mime,byte_size FROM media_objects WHERE image_key=?').get(key);if(old&&(old.mime!==image.mime||old.byte_size!==image.data.length))throw failure(409,'Image metadata differs from original');
+ db.prepare("INSERT OR IGNORE INTO media_objects(image_key,owner_id,mime,sha256,byte_size,status) VALUES(?,?,?,?,?,'pending')").run(key,owner,image.mime,sha,image.data.length);
+ const f=filename(key);let temp;
+ try{mkdirSync(path.dirname(f),{recursive:true,mode:0o700});if(existsSync(f)&&lstatSync(f).isFile()&&digest(readFileSync(f))===sha){mark(key,'ready');return{key,status:'ready'};}
+ temp=f+'.tmp-'+randomBytes(8).toString('hex');writeFileSync(temp,image.data,{flag:'wx',mode:0o600});const fd=openSync(temp,'r');try{fsyncSync(fd);}finally{closeSync(fd);}if(digest(readFileSync(temp))!==sha)throw new Error('Checksum verification failed');
+ const existed=existsSync(f);if(existed)renameSync(temp,f);else{linkSync(temp,f);unlinkSync(temp);}temp=null;const dirFd=openSync(path.dirname(f),'r');try{fsyncSync(dirFd);}finally{closeSync(dirFd);}if(!existed&&batchCreated)batchCreated.add(key);if(digest(readFileSync(f))!==sha)throw new Error('Checksum verification failed');mark(key,'ready');return{key,status:'ready'};
+ }catch(e){if(temp)try{unlinkSync(temp);}catch{}mark(key,'pending','storage_unavailable');return{key,status:'pending'};}}
+ function status(key,owner){if(!key)return 'none';const row=metadata(key,owner);try{const st=lstatSync(filename(key));if(!st.isFile())return mark(key,'missing','file_missing');if(st.size!==row.byte_size)return mark(key,'corrupt','size_mismatch');}catch{return mark(key,row.status==='pending'?'pending':'missing','file_missing');}return row.status;}
+ function read(key,owner){const row=metadata(key,owner);let data;try{const f=filename(key);if(!lstatSync(f).isFile())throw new Error('Missing');data=readFileSync(f);}catch{mark(key,row.status==='pending'?'pending':'missing','file_missing');throw failure(404,'Image unavailable; retry its original upload or restore media backup');}if(data.length!==row.byte_size||digest(data)!==row.sha256){mark(key,'corrupt','checksum_mismatch');throw failure(404,'Image integrity check failed; retry original upload or restore media backup');}mark(key,'ready');return{mime:row.mime,data};}
+ function describe(row,owner){return{image_key:row.image_key||null,media_status:row.media_status==='legacy'?'legacy':row.image_key?status(row.image_key,owner):(row.data||row.snapshot?'legacy':row.media_status||'none')};}
+ function begin(){batchCreated=new Set();}function commit(){batchCreated=null;}function rollback(){const keys=batchCreated||[];batchCreated=null;for(const key of keys)if(!db.prepare('SELECT 1 FROM media_objects WHERE image_key=?').get(key))try{unlinkSync(filename(key));}catch{}}
+ function migrateLegacy(){const sources=[{table:'samples',blob:'data',mime:'mime',query:'SELECT s.id,s.data,s.mime,r.user_id owner FROM samples s JOIN dishes d ON d.id=s.dish_id JOIN restaurants r ON r.id=d.restaurant_id WHERE s.data IS NOT NULL AND s.id>? ORDER BY s.id LIMIT 1'},{table:'events',blob:'snapshot',mime:'snapshot_mime',query:'SELECT id,snapshot,snapshot_mime,user_id owner FROM events WHERE snapshot IS NOT NULL AND id>? ORDER BY id LIMIT 1'},{table:'unknown_crossings',blob:'snapshot',mime:'snapshot_mime',query:'SELECT id,snapshot,snapshot_mime,owner_id owner FROM unknown_crossings WHERE snapshot IS NOT NULL AND id>? ORDER BY id LIMIT 1'}];
+ const pending=sources.some(s=>db.prepare(`SELECT 1 FROM ${s.table} WHERE ${s.blob} IS NOT NULL LIMIT 1`).get());if(!pending)return{migrated:0,remaining:0};
+ try{const backupDir=path.join(dataDir,'migration-backups');mkdirSync(backupDir,{recursive:true,mode:0o700});const backup=path.join(backupDir,`pre-media-${Date.now()}-${randomBytes(4).toString('hex')}.sqlite`);db.exec(`VACUUM INTO '${backup.replaceAll("'","''")}'`);}catch{return{migrated:0,remaining:'legacy',backupFailed:true};}
+ let migrated=0,remaining=0;for(const source of sources){let last=0;while(true){const row=db.prepare(source.query).get(last);if(!row)break;last=row.id;const image={mime:row[source.mime],data:Buffer.from(row[source.blob])};let stored;try{stored=put(row.owner,image);if(stored.status==='ready'){const verified=read(stored.key,row.owner);if(!verified.data.equals(image.data))throw new Error('Migration verification failed');db.prepare(`UPDATE ${source.table} SET image_key=?,media_status='ready',${source.blob}=NULL WHERE id=?`).run(stored.key,row.id);migrated++;}else{db.prepare(`UPDATE ${source.table} SET image_key=?,media_status='legacy' WHERE id=?`).run(stored.key,row.id);remaining++;}}catch{remaining++;}}}return{migrated,remaining};}
+ const describeSample=(row,owner)=>({...describe(row,owner),url:`/api/samples/${row.id}`});
+ return{put,read,status,keyFor,describe,describeSample,begin,commit,rollback,migrateLegacy};
+}

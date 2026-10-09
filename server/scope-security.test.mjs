@@ -21,6 +21,9 @@ test('resource IDs retain their restaurant scope despite spoofed query and body 
   const owner=cookie;
   const a=(await call('/api/restaurants',{name:'Allowed'})).body.restaurant;
   const b=(await call('/api/restaurants',{name:'Restricted'})).body.restaurant;
+  const incompleteUnknown={sessionId:'invalid-unknown',occurredAt:'2026-10-09T10:00:00Z'};
+  assert.equal((await call('/api/unknown-events',{restaurantId:a.id,events:[{...incompleteUnknown,crossingId:'one'}]})).status,400,'unknown crossing must identify its track');
+  assert.equal((await call('/api/unknown-events',{restaurantId:a.id,events:[{...incompleteUnknown,trackId:'one'}]})).status,400,'unknown crossing must identify its crossing');
   const png='data:image/png;base64,iVBORw0KGgo=';
   const resources=[];
   for(const r of [a,b]){

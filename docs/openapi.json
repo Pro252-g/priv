@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "IEP Vision Pilot API",
-    "version": "0.2.0",
+    "version": "0.3.0",
     "description": "Role and restaurant scoped. Daily totals are reconciliation signals, not proof of theft. Recorded experiments never enter live totals."
   },
   "servers": [
@@ -147,6 +147,168 @@
     }
   },
   "paths": {
+    "/api/recognition/classes": {
+      "get": {
+        "summary": "الفئات الثمانون المدعومة للاختيار الصريح",
+        "x-capability": "catalog.read",
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Successful operation"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Role/key scope denied"
+          },
+          "404": {
+            "description": "Resource not found or outside restaurant scope"
+          },
+          "409": {
+            "description": "Revision changed / closed day / already resolved"
+          }
+        }
+      }
+    },
+    "/api/dishes/{id}": {
+      "post": {
+        "summary": "تعديل نوع العنصر وطريقة التعرف والفئات",
+        "x-capability": "catalog.write",
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation"
+          },
+          "201": {
+            "description": "Created where applicable"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Role/key scope denied"
+          },
+          "404": {
+            "description": "Resource not found or outside restaurant scope"
+          },
+          "409": {
+            "description": "Revision changed / closed day / already resolved"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "kind": {
+                    "enum": [
+                      "dish",
+                      "drink",
+                      "object",
+                      "person"
+                    ]
+                  },
+                  "recognitionMode": {
+                    "enum": [
+                      "reference",
+                      "detector"
+                    ]
+                  },
+                  "detectorClasses": {
+                    "type": "array",
+                    "maxItems": 80,
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "أرشفة صنف دون حذف تاريخه",
+        "x-capability": "catalog.write",
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful operation"
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Role/key scope denied"
+          },
+          "404": {
+            "description": "Resource not found or outside restaurant scope"
+          },
+          "409": {
+            "description": "Revision changed / closed day / already resolved"
+          }
+        }
+      }
+    },
     "/api/logout": {
       "post": {
         "summary": "إنهاء جلسة المتصفح",
@@ -827,6 +989,27 @@
                   },
                   "name": {
                     "type": "string"
+                  },
+                  "kind": {
+                    "enum": [
+                      "dish",
+                      "drink",
+                      "object",
+                      "person"
+                    ]
+                  },
+                  "recognitionMode": {
+                    "enum": [
+                      "reference",
+                      "detector"
+                    ]
+                  },
+                  "detectorClasses": {
+                    "type": "array",
+                    "maxItems": 80,
+                    "items": {
+                      "type": "string"
+                    }
                   }
                 },
                 "required": [
@@ -835,51 +1018,6 @@
                 ]
               }
             }
-          }
-        }
-      }
-    },
-    "/api/dishes/{id}": {
-      "delete": {
-        "summary": "أرشفة صنف دون حذف تاريخه",
-        "x-capability": "catalog.write",
-        "security": [
-          {
-            "cookieAuth": []
-          },
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "minimum": 1
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful operation"
-          },
-          "400": {
-            "description": "Invalid input"
-          },
-          "401": {
-            "description": "Authentication required"
-          },
-          "403": {
-            "description": "Role/key scope denied"
-          },
-          "404": {
-            "description": "Resource not found or outside restaurant scope"
-          },
-          "409": {
-            "description": "Revision changed / closed day / already resolved"
           }
         }
       }
@@ -939,6 +1077,10 @@
                 "properties": {
                   "image": {
                     "type": "string"
+                  },
+                  "variantLabel": {
+                    "type": "string",
+                    "maxLength": 100
                   }
                 },
                 "required": [
